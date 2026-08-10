@@ -1,4 +1,4 @@
-from webhook_inbox.log import REDACTED, redact
+from app.log import REDACTED, redact
 
 
 def test_redacts_sensitive_top_level_keys() -> None:

@@ -4,7 +4,7 @@ from fastapi import APIRouter, Request, Response
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 
-from webhook_inbox.deps import DatabaseDep
+from app.deps import DatabaseDep
 
 router = APIRouter()
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))

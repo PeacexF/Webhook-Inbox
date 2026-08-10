@@ -1,4 +1,4 @@
-from webhook_inbox.ingest.parser import (
+from app.ingest.parser import (
     decode_raw,
     escape_keys,
     extract_event_type,

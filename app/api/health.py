@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
-from webhook_inbox.deps import DatabaseDep
+from app.deps import DatabaseDep
 
 router = APIRouter()
 

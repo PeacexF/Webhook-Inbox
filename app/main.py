@@ -3,12 +3,12 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from webhook_inbox import log
-from webhook_inbox.api import health
-from webhook_inbox.config import Settings
-from webhook_inbox.db import create_client, ensure_indexes
-from webhook_inbox.ingest import receiver
-from webhook_inbox.web import routes
+from app import log
+from app.api import health
+from app.config import Settings
+from app.db import create_client, ensure_indexes
+from app.ingest import receiver
+from app.web import routes
 
 logger = log.get_logger(__name__)
 

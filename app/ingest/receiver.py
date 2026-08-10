@@ -3,15 +3,15 @@ from datetime import UTC, datetime
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
-from webhook_inbox.db import Doc
-from webhook_inbox.deps import DatabaseDep, SettingsDep
-from webhook_inbox.ingest.parser import (
+from app.db import Doc
+from app.deps import DatabaseDep, SettingsDep
+from app.ingest.parser import (
     decode_raw,
     escape_keys,
     extract_event_type,
     parse_body,
 )
-from webhook_inbox.log import get_logger
+from app.log import get_logger
 
 router = APIRouter()
 logger = get_logger(__name__)

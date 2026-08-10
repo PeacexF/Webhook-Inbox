@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from webhook_inbox.config import Settings, load_settings
+from app.config import Settings, load_settings
 
 
 @pytest.fixture(autouse=True)

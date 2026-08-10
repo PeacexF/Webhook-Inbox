@@ -7,8 +7,8 @@ import httpx
 import pytest
 from testcontainers.community.mongodb import MongoDbContainer
 
-from webhook_inbox.config import Settings
-from webhook_inbox.main import create_app
+from app.config import Settings
+from app.main import create_app
 
 
 @pytest.fixture(autouse=True)

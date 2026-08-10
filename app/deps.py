@@ -2,8 +2,8 @@ from typing import Annotated
 
 from fastapi import Depends, Request
 
-from webhook_inbox.config import Settings
-from webhook_inbox.db import Database
+from app.config import Settings
+from app.db import Database
 
 
 def get_db(request: Request) -> Database:
