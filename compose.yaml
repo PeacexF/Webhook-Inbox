@@ -1,0 +1,39 @@
+services:
+  app:
+    build: .
+    ports:
+      - "${APP_PORT:-8000}:8000"
+    # Anything in .env reaches the app, including nested keys like LIMITS__MAX_PAYLOAD_SIZE
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      MONGO_URI: mongodb://mongodb:27017
+      MONGO_DATABASE: ${MONGO_DATABASE:-webhook_inbox}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LIMITS__MAX_PAYLOAD_SIZE: ${LIMITS__MAX_PAYLOAD_SIZE:-10485760}
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request as r; r.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  mongodb:
+    image: mongo:8
+    volumes:
+      - mongodb_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+volumes:
+  mongodb_data:

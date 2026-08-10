@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Events — Webhook Inbox{% endblock %}
+{% block content %}
+<p>{{ total }} event{{ '' if total == 1 else 's' }}</p>
+{% if events %}
+<table>
+  <thead>
+    <tr><th>Time</th><th>Endpoint</th><th>Event</th><th>Method</th><th>Status</th></tr>
+  </thead>
+  <tbody>
+    {% for event in events %}
+    <tr>
+      <td>{{ event.received_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+      <td>{{ event.endpoint.name }}</td>
+      <td>{{ event.event_type or '—' }}</td>
+      <td>{{ event.request.method }}</td>
+      <td>{{ event.processing.response_status }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="empty">No events yet. Send one to <code>/webhooks/demo</code>.</p>
+{% endif %}
+{% endblock %}

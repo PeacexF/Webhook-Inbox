@@ -1,0 +1,32 @@
+FROM ghcr.io/astral-sh/uv:python3.14-bookworm-slim AS builder
+
+ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy
+
+WORKDIR /app
+
+COPY pyproject.toml uv.lock ./
+
+RUN uv sync --locked --no-install-project --no-dev
+
+COPY webhook_inbox ./webhook_inbox
+COPY README.md ./
+
+RUN uv sync --locked --no-dev
+
+
+FROM python:3.14-slim
+
+ENV PATH="/app/.venv/bin:$PATH" PYTHONUNBUFFERED=1
+
+RUN useradd --create-home --uid 1000 app
+
+WORKDIR /app
+
+COPY --from=builder --chown=app:app /app/.venv /app/.venv
+COPY --chown=app:app webhook_inbox ./webhook_inbox
+
+USER app
+
+EXPOSE 8000
+
+CMD ["uvicorn", "webhook_inbox.main:app", "--host", "0.0.0.0", "--port", "8000"]

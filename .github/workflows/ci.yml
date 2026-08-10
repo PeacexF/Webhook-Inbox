@@ -1,0 +1,60 @@
+name: CI [Webhook Inbox]
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - run: uv sync --locked
+
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Format
+        run: uv run ruff format --check .
+
+      - name: Typecheck
+        run: uv run mypy
+
+      - name: Test
+        run: uv run pytest -q
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Build and start the stack
+        run: docker compose up --build -d --wait
+
+      - name: Send a webhook and assert it lands
+        run: |
+          curl -fsS -X POST http://localhost:8000/webhooks/demo \
+            -H 'Content-Type: application/json' \
+            -H 'X-Webhook-Event: user.created' \
+            -d '{"event":"user.created","user":{"id":1827,"name":"John Doe"}}'
+          curl -fsS http://localhost:8000/events | grep -q 'user.created'
+
+      - name: Events survive an app restart
+        run: |
+          docker compose restart app
+          timeout 60 sh -c 'until curl -fsS http://localhost:8000/ready; do sleep 2; done'
+          curl -fsS http://localhost:8000/events | grep -q 'user.created'
+
+      - name: Dump logs on failure
+        if: failure()
+        run: docker compose logs

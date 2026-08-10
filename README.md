@@ -25,11 +25,30 @@ It is designed to make debugging webhook integrations easier by providing a cent
 * **MongoDB**
 * **Docker / Docker Compose**
 
+## Quick Start
+
+```bash
+cp .env.example .env
+docker compose up --build
+```
+
+Send a webhook:
+
+```bash
+curl -X POST http://localhost:8000/webhooks/demo \
+  -H "Content-Type: application/json" \
+  -H "X-Webhook-Event: user.created" \
+  -d '{"event": "user.created", "user": {"id": 1827, "name": "John Doe"}}'
+```
+
+Then open <http://localhost:8000/events>.
+
 ## Status
 
-**Planning / Early Development**
+**Early Development**
 
-The project is currently being designed
+Webhook ingestion, storage and a minimal event list are working. Endpoint management,
+dashboard authentication, search, and replay are still in progress.
 
 ## License
 
