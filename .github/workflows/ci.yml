@@ -49,6 +49,34 @@ jobs:
             -d '{"event":"user.created","user":{"id":1827,"name":"John Doe"}}'
           curl -fsS http://localhost:8000/events | grep -q 'user.created'
 
+      - name: HMAC endpoint accepts a signed body and rejects a tampered one
+        run: |
+          secret=ci-secret
+          curl -fsS -X POST http://localhost:8000/api/endpoints \
+            -H 'Content-Type: application/json' \
+            -d "{\"name\":\"github\",\"path\":\"github\",\"authentication\":{\"type\":\"hmac_sha256\"},\"secret\":\"$secret\"}"
+
+          body='{"action":"opened"}'
+          sig="sha256=$(printf '%s' "$body" | openssl dgst -sha256 -hmac "$secret" | awk '{print $2}')"
+
+          code=$(curl -s -o /dev/null -w '%{http_code}' -X POST http://localhost:8000/webhooks/github \
+            -H 'Content-Type: application/json' -H "X-Hub-Signature-256: $sig" -d "$body")
+          [ "$code" = 202 ] || { echo "signed request got $code, expected 202"; exit 1; }
+
+          code=$(curl -s -o /dev/null -w '%{http_code}' -X POST http://localhost:8000/webhooks/github \
+            -H 'Content-Type: application/json' -H "X-Hub-Signature-256: $sig" -d '{"action":"tampered"}')
+          [ "$code" = 401 ] || { echo "tampered request got $code, expected 401"; exit 1; }
+
+      - name: Endpoint secrets never leave the API
+        run: |
+          if curl -fsS http://localhost:8000/api/endpoints | grep -q 'ci-secret'; then
+            echo "secret leaked via the API"; exit 1
+          fi
+          if docker compose logs app | grep -q 'ci-secret'; then
+            echo "secret leaked into the logs"; exit 1
+          fi
+          echo "no secret leaked"
+
       - name: Events survive an app restart
         run: |
           docker compose restart app

@@ -3,7 +3,11 @@ from collections.abc import AsyncIterator, Callable
 import httpx
 import pytest
 
+from tests.helpers import create_endpoint
+
 pytestmark = pytest.mark.integration
+
+ALL_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"]
 
 
 async def test_health_and_ready(client: httpx.AsyncClient) -> None:
@@ -30,6 +34,7 @@ async def test_json_webhook_is_stored_and_listed(client: httpx.AsyncClient) -> N
 
 
 async def test_non_json_body_is_preserved(client: httpx.AsyncClient) -> None:
+    await create_endpoint(client, name="text", path="text")
     response = await client.post(
         "/webhooks/text", content=b"plain payload", headers={"content-type": "text/plain"}
     )
@@ -45,7 +50,8 @@ async def test_restricted_keys_are_accepted(client: httpx.AsyncClient) -> None:
 
 
 async def test_all_methods_are_captured(client: httpx.AsyncClient) -> None:
-    for method in ("GET", "POST", "PUT", "PATCH", "DELETE"):
+    await create_endpoint(client, name="multi", path="multi", allowed_methods=ALL_METHODS)
+    for method in ALL_METHODS:
         response = await client.request(method, "/webhooks/multi")
         assert response.status_code == 202
 

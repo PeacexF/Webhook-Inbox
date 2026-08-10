@@ -11,12 +11,12 @@ from app.ingest.parser import (
     extract_event_type,
     parse_body,
 )
+from app.ingest.signature import verify
 from app.log import get_logger
+from app.models.endpoint import ALLOWED_METHODS, normalize_path
 
 router = APIRouter()
 logger = get_logger(__name__)
-
-METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"]
 
 
 class PayloadTooLarge(Exception):
@@ -39,26 +39,44 @@ async def read_limited(request: Request, limit: int) -> bytes:
     return b"".join(chunks)
 
 
-@router.api_route("/webhooks/{path:path}", methods=METHODS)
+def _reject(status: int, reason: str, path: str) -> JSONResponse:
+    logger.warning("event.rejected", endpoint=path, reason=reason, status=status)
+    return JSONResponse({"detail": reason}, status_code=status)
+
+
+@router.api_route("/webhooks/{path:path}", methods=list(ALLOWED_METHODS))
 async def receive(
     path: str,
     request: Request,
     db: DatabaseDep,
     settings: SettingsDep,
 ) -> JSONResponse:
+    path = normalize_path(path)
+    endpoint = await db.endpoints.find_one({"path": path})
+    if endpoint is None:
+        return _reject(404, "Unknown endpoint", path)
+    if not endpoint.get("enabled", True):
+        return _reject(403, "Endpoint is disabled", path)
+    if request.method not in endpoint.get("allowed_methods", ["POST"]):
+        return _reject(405, "Method not allowed for this endpoint", path)
+
+    limit = endpoint.get("max_payload_size") or settings.limits.max_payload_size
     try:
-        raw = await read_limited(request, settings.limits.max_payload_size)
+        raw = await read_limited(request, limit)
     except PayloadTooLarge:
-        logger.warning("event.rejected", endpoint=path, reason="payload_too_large")
-        return JSONResponse({"detail": "Payload too large"}, status_code=413)
+        return _reject(413, "Payload too large", path)
 
     headers = dict(request.headers)
+    # Signature is checked against the untouched bytes, before any parsing
+    if not verify(endpoint, headers, raw):
+        return _reject(401, "Invalid signature", path)
+
     content_type = headers.get("content-type", "")
     body = parse_body(raw, content_type)
     raw_text, raw_encoding = decode_raw(raw)
 
     document: Doc = {
-        "endpoint": {"id": None, "name": path},
+        "endpoint": {"id": endpoint["_id"], "name": endpoint["name"]},
         "received_at": datetime.now(UTC),
         "event_type": extract_event_type(headers, body),
         "request": {
@@ -71,7 +89,7 @@ async def receive(
             "content_type": content_type,
             "body_size": len(raw),
         },
-        "processing": {"status": "received", "response_status": 200},
+        "processing": {"status": "received", "response_status": 202},
         "metadata": {
             "source_ip": request.client.host if request.client else None,
             "user_agent": headers.get("user-agent"),
