@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}{{ event.event_type or 'Event' }} — Webhook Inbox{% endblock %}
+{% block content %}
+<div class="toolbar">
+  <h1 style="margin:0">{{ event.event_type or 'Event' }}</h1>
+  <a href="/events">← Back to events</a>
+</div>
+
+<div class="tabs">
+  {% for name in ['overview', 'headers', 'query', 'body', 'raw'] %}
+  <a href="/events/{{ event._id }}?tab={{ name }}"
+     class="{{ 'active' if tab == name else '' }}">{{ name|capitalize }}</a>
+  {% endfor %}
+</div>
+
+{% if tab == 'overview' %}
+<dl class="kv">
+  <dt>Event ID</dt><dd>{{ event._id }}</dd>
+  <dt>Endpoint</dt><dd>{{ event.endpoint.name }}</dd>
+  <dt>Received</dt><dd>{{ event.received_at.strftime('%Y-%m-%d %H:%M:%S UTC') }}</dd>
+  <dt>Processing status</dt>
+  <dd><span class="status {{ 'err' if event.processing.status == 'failed' else 'ok' }}">
+    {{ event.processing.status }}</span></dd>
+  <dt>HTTP status</dt><dd>{{ event.processing.response_status }}</dd>
+  <dt>Method</dt><dd>{{ event.request.method }}</dd>
+  <dt>Content type</dt><dd>{{ event.request.content_type or '—' }}</dd>
+  <dt>Body size</dt><dd>{{ "{:,}".format(event.request.body_size or 0) }} bytes</dd>
+  <dt>Source IP</dt><dd>{{ event.metadata.source_ip or '—' }}</dd>
+  <dt>User agent</dt><dd>{{ event.metadata.user_agent or '—' }}</dd>
+</dl>
+
+{% elif tab == 'headers' %}
+{% if event.request.headers %}
+<dl class="kv">
+  {% for key, value in event.request.headers.items() | sort %}
+  <dt>{{ key }}</dt><dd>{{ value }}</dd>
+  {% endfor %}
+</dl>
+{% else %}<p class="hint">No headers recorded.</p>{% endif %}
+
+{% elif tab == 'query' %}
+{% if event.request.query %}
+<dl class="kv">
+  {% for key, value in event.request.query.items() | sort %}
+  <dt>{{ key }}</dt><dd>{{ value }}</dd>
+  {% endfor %}
+</dl>
+{% else %}<p class="hint">No query parameters.</p>{% endif %}
+
+{% elif tab == 'body' %}
+{% if body is none %}
+<p class="hint">No structured body. See the Raw tab.</p>
+{% else %}
+{{ body_html }}
+{% endif %}
+
+{% elif tab == 'raw' %}
+<pre class="raw">{{ event.request.raw_body or '' }}</pre>
+{% if event.request.raw_encoding == 'base64' %}
+<p class="hint">Body was not valid UTF-8 and is shown base64-encoded.</p>
+{% endif %}
+{% endif %}
+{% endblock %}

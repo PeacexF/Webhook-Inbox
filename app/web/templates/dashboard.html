@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — Webhook Inbox{% endblock %}
+{% block content %}
+<h1>Dashboard</h1>
+
+<div class="stats">
+  <div class="stat">
+    <div class="label">Events</div>
+    <div class="value">{{ "{:,}".format(stats.total) }}</div>
+  </div>
+  <div class="stat">
+    <div class="label">Last 24 hours</div>
+    <div class="value">{{ "{:,}".format(stats.last_24h) }}</div>
+  </div>
+  <div class="stat">
+    <div class="label">Failed</div>
+    <div class="value {% if not stats.failed %}muted{% endif %}">{{ "{:,}".format(stats.failed) }}</div>
+  </div>
+  <div class="stat">
+    <div class="label">Endpoints</div>
+    <div class="value">{{ "{:,}".format(stats.endpoints) }}</div>
+  </div>
+</div>
+
+<h2>Recent events</h2>
+{% include "_events_table.html" %}
+{% endblock %}

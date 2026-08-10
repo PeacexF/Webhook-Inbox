@@ -40,6 +40,21 @@ jobs:
 
       - name: Build and start the stack
         run: docker compose up --build -d --wait
+        env:
+          ADMIN_PASSWORD: ci-admin-password
+
+      - name: Sign in and keep the session
+        run: |
+          csrf=$(curl -fsS -c /tmp/cookies -X POST http://localhost:8000/api/auth/login \
+            -H 'Content-Type: application/json' \
+            -d '{"username":"admin","password":"ci-admin-password"}' \
+            | python3 -c 'import json,sys; print(json.load(sys.stdin)["csrf_token"])')
+          echo "CSRF=$csrf" >> "$GITHUB_ENV"
+
+      - name: The dashboard is not reachable anonymously
+        run: |
+          code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8000/api/endpoints)
+          [ "$code" = 401 ] || { echo "unauthenticated API returned $code, expected 401"; exit 1; }
 
       - name: Send a webhook and assert it lands
         run: |
@@ -47,13 +62,13 @@ jobs:
             -H 'Content-Type: application/json' \
             -H 'X-Webhook-Event: user.created' \
             -d '{"event":"user.created","user":{"id":1827,"name":"John Doe"}}'
-          curl -fsS http://localhost:8000/events | grep -q 'user.created'
+          curl -fsS -b /tmp/cookies http://localhost:8000/events | grep -q 'user.created'
 
       - name: HMAC endpoint accepts a signed body and rejects a tampered one
         run: |
           secret=ci-secret
-          curl -fsS -X POST http://localhost:8000/api/endpoints \
-            -H 'Content-Type: application/json' \
+          curl -fsS -b /tmp/cookies -X POST http://localhost:8000/api/endpoints \
+            -H 'Content-Type: application/json' -H "X-CSRF-Token: $CSRF" \
             -d "{\"name\":\"github\",\"path\":\"github\",\"authentication\":{\"type\":\"hmac_sha256\"},\"secret\":\"$secret\"}"
 
           body='{"action":"opened"}'
@@ -69,7 +84,7 @@ jobs:
 
       - name: Endpoint secrets never leave the API
         run: |
-          if curl -fsS http://localhost:8000/api/endpoints | grep -q 'ci-secret'; then
+          if curl -fsS -b /tmp/cookies http://localhost:8000/api/endpoints | grep -q 'ci-secret'; then
             echo "secret leaked via the API"; exit 1
           fi
           if docker compose logs app | grep -q 'ci-secret'; then
@@ -81,7 +96,7 @@ jobs:
         run: |
           docker compose restart app
           timeout 60 sh -c 'until curl -fsS http://localhost:8000/ready; do sleep 2; done'
-          curl -fsS http://localhost:8000/events | grep -q 'user.created'
+          curl -fsS -b /tmp/cookies http://localhost:8000/events | grep -q 'user.created'
 
       - name: Dump logs on failure
         if: failure()

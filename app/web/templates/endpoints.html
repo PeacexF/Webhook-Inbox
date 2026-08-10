@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Endpoints — Webhook Inbox{% endblock %}
+{% block content %}
+<h1>Endpoints</h1>
+
+{% if error %}<div class="alert error">{{ error }}</div>{% endif %}
+
+<div class="panel">
+  {% if endpoints %}
+  <table>
+    <thead>
+      <tr><th>Name</th><th>URL</th><th>Auth</th><th>Methods</th><th>Enabled</th></tr>
+    </thead>
+    <tbody>
+      {% for endpoint in endpoints %}
+      <tr onclick="window.location='/endpoints/{{ endpoint.id }}'" style="cursor:pointer">
+        <td class="primary">{{ endpoint.name }}</td>
+        <td class="mono">{{ endpoint.url }}</td>
+        <td class="time">{{ endpoint.authentication.type }}</td>
+        <td class="time">{{ endpoint.allowed_methods | join(', ') }}</td>
+        <td><span class="status {{ 'ok' if endpoint.enabled else 'warn' }}">
+          {{ 'yes' if endpoint.enabled else 'no' }}</span></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty">No endpoints yet.</div>
+  {% endif %}
+</div>
+
+<h2>Create endpoint</h2>
+<form class="panel" style="padding:1.1rem" hx-post="/endpoints" hx-target="body">
+  <div class="row">
+    <div class="field">
+      <label for="name">Name</label>
+      <input id="name" name="name" required placeholder="github">
+    </div>
+    <div class="field">
+      <label for="path">Path</label>
+      <input id="path" name="path" required placeholder="github">
+    </div>
+  </div>
+  <div class="row">
+    <div class="field">
+      <label for="auth_type">Authentication</label>
+      <select id="auth_type" name="auth_type">
+        <option value="none">none</option>
+        <option value="static_secret">static_secret</option>
+        <option value="hmac_sha256">hmac_sha256</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="secret">Secret</label>
+      <input id="secret" name="secret" type="password" placeholder="required unless auth is none">
+    </div>
+  </div>
+  <div class="field">
+    <label for="allowed_methods">Allowed methods</label>
+    <input id="allowed_methods" name="allowed_methods" value="POST" placeholder="POST, PUT">
+  </div>
+  <button class="primary" type="submit">Create endpoint</button>
+</form>
+{% endblock %}

@@ -20,6 +20,17 @@ ENDPOINT_INDEXES = [
     IndexModel([("path", 1)], name="path_unique", unique=True),
 ]
 
+USER_INDEXES = [
+    IndexModel([("username", 1)], name="username_unique", unique=True),
+]
+
+SESSION_INDEXES = [
+    IndexModel([("token_hash", 1)], name="token_unique", unique=True),
+    # Expired sessions are swept by MongoDB rather than by code
+    IndexModel([("expires_at", 1)], name="session_ttl", expireAfterSeconds=0),
+    IndexModel([("user_id", 1)], name="session_user"),
+]
+
 DEMO_ENDPOINT = {
     "name": "demo",
     "path": "demo",
@@ -39,6 +50,8 @@ def create_client(uri: str) -> AsyncMongoClient[Doc]:
 async def ensure_indexes(db: Database) -> None:
     await db.events.create_indexes(EVENT_INDEXES)
     await db.endpoints.create_indexes(ENDPOINT_INDEXES)
+    await db.users.create_indexes(USER_INDEXES)
+    await db.sessions.create_indexes(SESSION_INDEXES)
 
 
 async def seed_demo_endpoint(db: Database) -> None:

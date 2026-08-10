@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}{{ endpoint.name }} — Webhook Inbox{% endblock %}
+{% block content %}
+<div class="toolbar">
+  <h1 style="margin:0">{{ endpoint.name }}</h1>
+  <a href="/endpoints">← Back to endpoints</a>
+</div>
+
+{% if error %}<div class="alert error">{{ error }}</div>{% endif %}
+{% if saved %}<div class="alert ok">Saved.</div>{% endif %}
+
+<p class="hint">Receiving at <code>{{ endpoint.url }}</code></p>
+
+<form class="panel" style="padding:1.1rem" hx-post="/endpoints/{{ endpoint.id }}" hx-target="body">
+  <div class="row">
+    <div class="field">
+      <label for="name">Name</label>
+      <input id="name" name="name" value="{{ endpoint.name }}" required>
+    </div>
+    <div class="field">
+      <label for="path">Path</label>
+      <input id="path" name="path" value="{{ endpoint.path }}" required>
+    </div>
+  </div>
+  <div class="row">
+    <div class="field">
+      <label for="auth_type">Authentication</label>
+      <select id="auth_type" name="auth_type">
+        {% for option in ['none', 'static_secret', 'hmac_sha256'] %}
+        <option value="{{ option }}"
+          {% if endpoint.authentication.type == option %}selected{% endif %}>{{ option }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label for="secret">Secret</label>
+      <input id="secret" name="secret" type="password"
+        placeholder="{{ 'set — leave blank to keep' if endpoint.has_secret else 'not set' }}">
+    </div>
+  </div>
+  <div class="row">
+    <div class="field">
+      <label for="allowed_methods">Allowed methods</label>
+      <input id="allowed_methods" name="allowed_methods"
+        value="{{ endpoint.allowed_methods | join(', ') }}">
+    </div>
+    <div class="field">
+      <label for="max_payload_size">Max payload size (bytes, blank for global)</label>
+      <input id="max_payload_size" name="max_payload_size"
+        value="{{ endpoint.max_payload_size or '' }}">
+    </div>
+  </div>
+  <div class="field checkbox">
+    <input id="enabled" name="enabled" type="checkbox" {% if endpoint.enabled %}checked{% endif %}>
+    <label for="enabled" style="margin:0">Enabled</label>
+  </div>
+  <button class="primary" type="submit">Save</button>
+  <button class="danger" type="button"
+    hx-delete="/endpoints/{{ endpoint.id }}" hx-target="body"
+    hx-confirm="Delete {{ endpoint.name }}? Stored events are kept.">Delete</button>
+</form>
+{% endblock %}

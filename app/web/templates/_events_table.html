@@ -1,0 +1,26 @@
+<div class="panel">
+  {% if events %}
+  <table>
+    <thead>
+      <tr><th>Time</th><th>Endpoint</th><th>Event</th><th>Method</th><th>Status</th></tr>
+    </thead>
+    <tbody>
+      {% for event in events %}
+      <tr onclick="window.location='/events/{{ event._id }}'" style="cursor:pointer">
+        <td class="time">{{ event.received_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+        <td class="primary">{{ event.endpoint.name }}</td>
+        <td class="primary">{{ event.event_type or '—' }}</td>
+        <td class="time">{{ event.request.method }}</td>
+        <td class="num">
+          <span class="status {{ 'err' if event.processing.status == 'failed' else 'ok' }}">
+            {{ event.processing.response_status }}
+          </span>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty">No events yet. Send one to <code>/webhooks/demo</code>.</div>
+  {% endif %}
+</div>
