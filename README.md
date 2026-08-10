@@ -33,4 +33,4 @@ The project is currently being designed
 
 ## License
 
-MIT
+[Apache-2.0](LICENSE)
