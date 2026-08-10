@@ -8,7 +8,7 @@ COPY pyproject.toml uv.lock ./
 
 RUN uv sync --locked --no-install-project --no-dev
 
-COPY webhook_inbox ./webhook_inbox
+COPY app ./app
 COPY README.md ./
 
 RUN uv sync --locked --no-dev
@@ -23,10 +23,10 @@ RUN useradd --create-home --uid 1000 app
 WORKDIR /app
 
 COPY --from=builder --chown=app:app /app/.venv /app/.venv
-COPY --chown=app:app webhook_inbox ./webhook_inbox
+COPY --chown=app:app app ./app
 
 USER app
 
 EXPOSE 8000
 
-CMD ["uvicorn", "webhook_inbox.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
