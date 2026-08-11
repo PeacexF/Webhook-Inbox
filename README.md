@@ -1,6 +1,16 @@
-# Webhook Inbox
+<div align="center">
 
-**Webhook Inbox** is a self-hosted developer tool for receiving, inspecting, searching, and replaying webhook events.
+<img src=".github/img/logo.png" alt="Webhook Inbox" width="300">
+
+*Self-hosted developer tool for receiving, inspecting, searching, and replaying webhook events.*
+
+![Status](https://img.shields.io/badge/status-early%20development-5F8F72)
+![Python](https://img.shields.io/badge/Python-3.14%2B-252A27)
+![MongoDB](https://img.shields.io/badge/MongoDB-8.0%2B-252A27)
+![Docker](https://img.shields.io/badge/Docker-Compose-252A27)
+![License](https://img.shields.io/badge/license-Apache--2.0-5F8F72)
+
+</div>
 
 It is designed to make debugging webhook integrations easier by providing a central place to store incoming requests and explore them through a web dashboard.
 
