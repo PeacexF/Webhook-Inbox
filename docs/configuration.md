@@ -7,6 +7,7 @@
 - [`replay`](#replay)
 - [`retention`](#retention)
 - [`search`](#search)
+- [Backup and restore](#backup-and-restore)
 - [Per-endpoint overrides](#per-endpoint-overrides)
 
 ---
@@ -222,6 +223,50 @@ docker compose exec app python -m app.search.backfill --rebuild
 
 Without `--rebuild` the command only fills in events that have no search terms at all, which is what
 you want after upgrading from a version that predates the field.
+
+---
+
+## Backup and restore
+
+Events live in the `mongodb_data` Docker volume, which is independent of the containers. Rebuilding
+or recreating the application does not touch it; `docker compose down -v` destroys it.
+
+**Back up:**
+
+```bash
+docker compose exec -T mongodb mongodump \
+  --db webhook_inbox --archive --gzip > backup-$(date +%F).archive.gz
+```
+
+**Restore:**
+
+```bash
+docker compose exec -T mongodb mongorestore \
+  --archive --gzip --drop < backup-2026-08-11.archive.gz
+```
+
+`--drop` replaces the existing collections. Without it, documents are merged and duplicate `_id`s are
+skipped, which quietly leaves you with a mixture of both datasets.
+
+Under the production overlay MongoDB requires authentication, so add credentials:
+
+```bash
+docker compose -f compose.yaml -f compose.prod.yaml exec -T mongodb \
+  mongodump --username "$MONGO_ROOT_USERNAME" --password "$MONGO_ROOT_PASSWORD" \
+  --authenticationDatabase admin --db webhook_inbox --archive --gzip > backup.archive.gz
+```
+
+Two things worth knowing:
+
+- **Indexes are included in the dump and rebuilt on restore.** `ensure_indexes()` also runs at
+  startup and is idempotent, so a restore into a running deployment converges either way.
+- **Retention keeps running after a restore.** Events restored past their `expires_at` are removed by
+  the TTL monitor within roughly a minute. To keep an old archive intact, restore it into a
+  deployment with `retention.enabled: false`, or clear the field:
+  ```bash
+  docker compose exec -T mongodb mongosh --quiet --eval \
+    'db.getSiblingDB("webhook_inbox").events.updateMany({}, {$unset: {expires_at: ""}})'
+  ```
 
 ---
 

@@ -264,6 +264,7 @@ def _parse_endpoint_form(
     secret: str,
     allowed_methods: str,
     max_payload_size: str = "",
+    retention_days: str = "",
     enabled: bool = True,
 ) -> dict[str, Any]:
     return {
@@ -274,6 +275,7 @@ def _parse_endpoint_form(
         "secret": secret or None,
         "allowed_methods": [m.strip() for m in allowed_methods.split(",") if m.strip()],
         "max_payload_size": int(max_payload_size) if max_payload_size.strip().isdigit() else None,
+        "retention_days": int(retention_days) if retention_days.strip().isdigit() else None,
     }
 
 
@@ -353,6 +355,7 @@ async def endpoint_save(
     secret: Annotated[str, Form()] = "",
     allowed_methods: Annotated[str, Form()] = "POST",
     max_payload_size: Annotated[str, Form()] = "",
+    retention_days: Annotated[str, Form()] = "",
     enabled: Annotated[bool, Form()] = False,
 ) -> Response:
     object_id = _object_id(endpoint_id)
@@ -361,7 +364,14 @@ async def endpoint_save(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Endpoint not found")
 
     fields = _parse_endpoint_form(
-        name, path, auth_type, secret, allowed_methods, max_payload_size, enabled
+        name,
+        path,
+        auth_type,
+        secret,
+        allowed_methods,
+        max_payload_size=max_payload_size,
+        retention_days=retention_days,
+        enabled=enabled,
     )
     # A blank secret field means "keep the stored one", not "clear it"
     if not fields["secret"]:

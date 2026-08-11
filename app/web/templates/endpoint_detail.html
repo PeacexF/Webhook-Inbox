@@ -49,6 +49,10 @@
       <input id="max_payload_size" name="max_payload_size"
         value="{{ endpoint.max_payload_size or '' }}">
     </div>
+    <div class="field">
+      <label for="retention_days">Retention (days, blank for global)</label>
+      <input id="retention_days" name="retention_days" value="{{ endpoint.retention_days or '' }}">
+    </div>
   </div>
   <div class="field checkbox">
     <input id="enabled" name="enabled" type="checkbox" {% if endpoint.enabled %}checked{% endif %}>
