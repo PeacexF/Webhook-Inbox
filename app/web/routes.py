@@ -1,11 +1,11 @@
-from contextlib import suppress
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Annotated, Any
+from urllib.parse import urlencode
 
 from bson import ObjectId
 from bson.errors import InvalidId
-from fastapi import APIRouter, Form, HTTPException, Request, Response, status
+from fastapi import APIRouter, Form, HTTPException, Query, Request, Response, status
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import ValidationError
@@ -20,12 +20,20 @@ from app.auth import (
     hash_password,
     verify_password,
 )
-from app.db import Database, Doc
+from app.db import Database
 from app.deps import DatabaseDep, SettingsDep
 from app.ingest.parser import unescape_keys
 from app.log import get_logger
-from app.models.endpoint import AuthConfig, EndpointCreate, EndpointOut, EndpointUpdate, utcnow
+from app.models.endpoint import (
+    ALLOWED_METHODS,
+    AuthConfig,
+    EndpointCreate,
+    EndpointOut,
+    EndpointUpdate,
+    utcnow,
+)
 from app.models.user import UserCreate, UserOut
+from app.search.query import Cursor, Filters, find_events
 from app.web.json_view import render_json
 
 router = APIRouter()
@@ -116,20 +124,63 @@ async def dashboard(request: Request, db: DatabaseDep) -> Response:
 
 
 @router.get("/events")
-async def events_page(request: Request, db: DatabaseDep, before: str | None = None) -> Response:
-    # Keyset pagination: cheaper than skip once the collection grows
-    query: Doc = {}
-    if before:
-        with suppress(ValueError):
-            query["received_at"] = {"$lt": datetime.fromisoformat(before)}
+async def events_page(
+    request: Request,
+    db: DatabaseDep,
+    q: str = "",
+    endpoint: str = "",
+    event_status: Annotated[str, Query(alias="status")] = "",
+    method: str = "",
+    event_type: Annotated[str, Query(alias="type")] = "",
+    date_from: Annotated[str, Query(alias="from")] = "",
+    date_to: Annotated[str, Query(alias="to")] = "",
+    cursor: str | None = None,
+) -> Response:
+    filters = Filters(
+        endpoint=endpoint or None,
+        status=event_status or None,
+        method=method or None,
+        event_type=event_type or None,
+        date_from=date_from or None,
+        date_to=date_to or None,
+    )
+    rows, scored = await find_events(db, q, filters, PAGE_SIZE, Cursor.decode(cursor))
 
-    rows = [doc async for doc in db.events.find(query).sort("received_at", -1).limit(PAGE_SIZE)]
-    total = await db.events.count_documents({})
-    next_cursor = rows[-1]["received_at"].isoformat() if len(rows) == PAGE_SIZE else None
+    params = {
+        key: value
+        for key, value in (
+            ("q", q),
+            ("endpoint", endpoint),
+            ("status", event_status),
+            ("method", method),
+            ("type", event_type),
+            ("from", date_from),
+            ("to", date_to),
+        )
+        if value
+    }
+    next_url = None
+    if len(rows) == PAGE_SIZE:
+        # Keyset pagination: cheaper than skip once the collection grows
+        forward = {**params, "cursor": Cursor.after(rows[-1], scored).encode()}
+        next_url = f"/events?{urlencode(forward)}"
+
     return render(
         request,
         "events.html",
-        {"active": "events", "events": rows, "total": total, "next_cursor": next_cursor},
+        {
+            "active": "events",
+            "events": rows,
+            "scored": scored,
+            # A total for a ranked search would mean a second pass over every match
+            "total": None if scored else await db.events.count_documents(filters.to_query()),
+            "next_url": next_url,
+            "params": params,
+            "endpoints": await _endpoint_list(db),
+            "event_types": sorted(t for t in await db.events.distinct("event_type") if t),
+            "statuses": sorted(await db.events.distinct("processing.status")),
+            "methods": sorted(ALLOWED_METHODS),
+        },
     )
 
 

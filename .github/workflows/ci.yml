@@ -31,7 +31,10 @@ jobs:
         run: uv run mypy
 
       - name: Test
-        run: uv run pytest -q
+        run: uv run pytest -q -m "not slow"
+
+      - name: Search benchmark (100k events, asserts no collection scan)
+        run: uv run pytest -q -m slow
 
   docker:
     runs-on: ubuntu-latest
@@ -63,6 +66,18 @@ jobs:
             -H 'X-Webhook-Event: user.created' \
             -d '{"event":"user.created","user":{"id":1827,"name":"John Doe"}}'
           curl -fsS -b /tmp/cookies http://localhost:8000/events | grep -q 'user.created'
+
+      - name: Search finds the event, including through a typo
+        run: |
+          curl -fsS -b /tmp/cookies 'http://localhost:8000/events?q=user.created' | grep -q 'user.created'
+          curl -fsS -b /tmp/cookies 'http://localhost:8000/events?q=creted' | grep -q 'user.created'
+
+      - name: Filters narrow the event list
+        run: |
+          curl -fsS -b /tmp/cookies 'http://localhost:8000/events?type=user.created' | grep -q 'user.created'
+          if curl -fsS -b /tmp/cookies 'http://localhost:8000/events?q=zzzznothing' | grep -q '<tbody>'; then
+            echo "a query matching nothing still rendered rows"; exit 1
+          fi
 
       - name: HMAC endpoint accepts a signed body and rejects a tampered one
         run: |

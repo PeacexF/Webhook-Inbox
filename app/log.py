@@ -25,7 +25,7 @@ SENSITIVE_KEYS = frozenset(
 REDACTED = "[redacted]"
 
 
-def _is_sensitive(key: str) -> bool:
+def is_sensitive(key: str) -> bool:
     lowered = key.lower()
     return any(marker in lowered for marker in SENSITIVE_KEYS)
 
@@ -34,10 +34,10 @@ def redact(
     _logger: Any, _method: str, event_dict: structlog.types.EventDict
 ) -> structlog.types.EventDict:
     for key, value in event_dict.items():
-        if _is_sensitive(key):
+        if is_sensitive(key):
             event_dict[key] = REDACTED
         elif isinstance(value, dict):
-            event_dict[key] = {k: (REDACTED if _is_sensitive(k) else v) for k, v in value.items()}
+            event_dict[key] = {k: (REDACTED if is_sensitive(k) else v) for k, v in value.items()}
     return event_dict
 
 

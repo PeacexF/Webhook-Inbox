@@ -14,6 +14,7 @@ from app.ingest.parser import (
 from app.ingest.signature import verify
 from app.log import get_logger
 from app.models.endpoint import ALLOWED_METHODS, normalize_path
+from app.search import tokenize
 
 router = APIRouter()
 logger = get_logger(__name__)
@@ -74,21 +75,25 @@ async def receive(
     content_type = headers.get("content-type", "")
     body = parse_body(raw, content_type)
     raw_text, raw_encoding = decode_raw(raw)
+    event_type = extract_event_type(headers, body)
+    query = dict(request.query_params)
 
     document: Doc = {
         "endpoint": {"id": endpoint["_id"], "name": endpoint["name"]},
         "received_at": datetime.now(UTC),
-        "event_type": extract_event_type(headers, body),
+        "event_type": event_type,
         "request": {
             "method": request.method,
             "headers": headers,
-            "query": dict(request.query_params),
+            "query": query,
             "body": escape_keys(body),
             "raw_body": raw_text,
             "raw_encoding": raw_encoding,
             "content_type": content_type,
             "body_size": len(raw),
         },
+        # Derived at write time so search never has to touch the payload
+        "search": tokenize.build(endpoint["name"], event_type, headers, query, body),
         "processing": {"status": "received", "response_status": 202},
         "metadata": {
             "source_ip": request.client.host if request.client else None,

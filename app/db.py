@@ -13,6 +13,8 @@ EVENT_INDEXES = [
     IndexModel([("received_at", -1)], name="received_desc"),
     IndexModel([("processing.status", 1), ("received_at", -1)], name="status_received"),
     IndexModel([("event_type", 1)], name="event_type"),
+    IndexModel([("search.tokens", 1)], name="search_tokens"),
+    IndexModel([("search.trigrams", 1)], name="search_trigrams"),
 ]
 
 ENDPOINT_INDEXES = [

@@ -1,4 +1,4 @@
-.PHONY: install lint format typecheck test check clean
+.PHONY: install lint format typecheck test test-all backfill check clean
 
 install:
 	uv sync
@@ -15,7 +15,14 @@ typecheck:
 	uv run mypy
 
 test:
+	uv run pytest -m "not slow"
+
+# includes the 100k event search bench
+test-all:
 	uv run pytest
+
+backfill:
+	uv run python -m app.search.backfill
 
 check: lint typecheck test
 

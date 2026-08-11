@@ -2,7 +2,10 @@
   {% if events %}
   <table>
     <thead>
-      <tr><th>Time</th><th>Endpoint</th><th>Event</th><th>Method</th><th>Status</th></tr>
+      <tr>
+        <th>Time</th><th>Endpoint</th><th>Event</th><th>Method</th><th>Status</th>
+        {% if scored %}<th>Match</th>{% endif %}
+      </tr>
     </thead>
     <tbody>
       {% for event in events %}
@@ -16,11 +19,24 @@
             {{ event.processing.response_status }}
           </span>
         </td>
+        {% if scored %}
+        {% set tier = 'exact' if event.score >= 100 else 'prefix' if event.score >= 60
+                 else 'token' if event.score >= 40 else 'fuzzy' %}
+        <td class="num">
+          <span class="match {{ tier }}" title="Relevance {{ event.score|round|int }}">{{ tier }}</span>
+        </td>
+        {% endif %}
       </tr>
       {% endfor %}
     </tbody>
   </table>
   {% else %}
-  <div class="empty">No events yet. Send one to <code>/webhooks/demo</code>.</div>
+  <div class="empty">
+    {% if params and params.q %}
+    No events match “{{ params.q }}”.
+    {% else %}
+    No events yet. Send one to <code>/webhooks/demo</code>.
+    {% endif %}
+  </div>
   {% endif %}
 </div>

@@ -3,15 +3,57 @@
 {% block content %}
 <div class="toolbar">
   <h1 style="margin:0">Events</h1>
-  <span class="nav-user">{{ "{:,}".format(total) }} total</span>
+  {% if total is not none %}<span class="nav-user">{{ "{:,}".format(total) }} total</span>{% endif %}
 </div>
 
-{% include "_events_table.html" %}
+<form class="filters panel" hx-get="/events" hx-target="#results" hx-select="#results"
+      hx-swap="outerHTML" hx-push-url="true"
+      hx-trigger="keyup changed delay:300ms from:find input[name='q'], change">
+  <input class="search" type="search" name="q" value="{{ params.q }}"
+         placeholder="Search events…" autocomplete="off" aria-label="Search events">
 
-<div class="pager">
-  <span>{{ events|length }} shown</span>
-  {% if next_cursor %}
-  <a class="btn" href="/events?before={{ next_cursor }}">Older →</a>
-  {% endif %}
+  <select name="endpoint" aria-label="Endpoint">
+    <option value="">All endpoints</option>
+    {% for item in endpoints %}
+    <option value="{{ item.id }}" {% if params.endpoint == item.id %}selected{% endif %}>
+      {{ item.name }}
+    </option>
+    {% endfor %}
+  </select>
+
+  <select name="status" aria-label="Status">
+    <option value="">Any status</option>
+    {% for item in statuses %}
+    <option value="{{ item }}" {% if params.status == item %}selected{% endif %}>{{ item }}</option>
+    {% endfor %}
+  </select>
+
+  <select name="method" aria-label="Method">
+    <option value="">Any method</option>
+    {% for item in methods %}
+    <option value="{{ item }}" {% if params.method == item %}selected{% endif %}>{{ item }}</option>
+    {% endfor %}
+  </select>
+
+  <select name="type" aria-label="Event type">
+    <option value="">Any type</option>
+    {% for item in event_types %}
+    <option value="{{ item }}" {% if params.type == item %}selected{% endif %}>{{ item }}</option>
+    {% endfor %}
+  </select>
+
+  {# bracket access: 'from' is a reserved word in Jinja #}
+  <input type="date" name="from" value="{{ params['from'] }}" aria-label="From date">
+  <input type="date" name="to" value="{{ params['to'] }}" aria-label="To date">
+
+  <a class="btn" href="/events">Reset</a>
+</form>
+
+<div id="results">
+  {% include "_events_table.html" %}
+  <div class="pager">
+    <span>{{ events|length }} shown</span>
+    {% if next_url %}<a class="btn" href="{{ next_url }}">Older →</a>{% endif %}
+  </div>
 </div>
 {% endblock %}
