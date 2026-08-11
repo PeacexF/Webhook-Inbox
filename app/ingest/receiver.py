@@ -14,6 +14,7 @@ from app.ingest.parser import (
 from app.ingest.signature import verify
 from app.log import get_logger
 from app.models.endpoint import ALLOWED_METHODS, normalize_path
+from app.retention import expires_at
 from app.search import tokenize
 
 router = APIRouter()
@@ -78,9 +79,10 @@ async def receive(
     event_type = extract_event_type(headers, body)
     query = dict(request.query_params)
 
+    received_at = datetime.now(UTC)
     document: Doc = {
         "endpoint": {"id": endpoint["_id"], "name": endpoint["name"]},
-        "received_at": datetime.now(UTC),
+        "received_at": received_at,
         "event_type": event_type,
         "request": {
             "method": request.method,
@@ -100,6 +102,10 @@ async def receive(
             "user_agent": headers.get("user-agent"),
         },
     }
+
+    # Absent when retention is off, so the TTL monitor leaves the event alone
+    if expiry := expires_at(endpoint, settings.retention, received_at):
+        document["expires_at"] = expiry
 
     result = await db.events.insert_one(document)
     logger.info("event.received", endpoint=path, id=str(result.inserted_id))

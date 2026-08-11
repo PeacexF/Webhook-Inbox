@@ -107,6 +107,45 @@ jobs:
           fi
           echo "no secret leaked"
 
+      - name: Export streams every format and honours the filters
+        run: |
+          for fmt in json jsonl csv; do
+            curl -fsS -b /tmp/cookies "http://localhost:8000/events/export?format=$fmt" \
+              -o "/tmp/export.$fmt"
+            [ -s "/tmp/export.$fmt" ] || { echo "$fmt export was empty"; exit 1; }
+          done
+          python3 -c 'import json; json.load(open("/tmp/export.json"))'
+          python3 -c 'import csv; assert len(list(csv.reader(open("/tmp/export.csv")))) >= 2'
+          grep -q 'user.created' /tmp/export.jsonl
+
+          # The internal search index must never reach an export
+          if grep -q 'trigrams' /tmp/export.jsonl; then
+            echo "the search index leaked into the export"; exit 1
+          fi
+
+          filtered=$(curl -fsS -b /tmp/cookies \
+            'http://localhost:8000/events/export?format=jsonl&type=user.created' | wc -l)
+          [ "$filtered" -ge 1 ] || { echo "the filtered export returned nothing"; exit 1; }
+
+          # Chunked with no content-length is what proves it streams
+          curl -s -o /dev/null -D /tmp/headers -b /tmp/cookies \
+            'http://localhost:8000/events/export?format=jsonl'
+          grep -qi 'transfer-encoding: chunked' /tmp/headers \
+            || { echo "the export was buffered, not streamed"; cat /tmp/headers; exit 1; }
+          echo "exports stream and respect filters"
+
+      - name: Events are stored with a retention expiry
+        run: |
+          docker compose exec -T mongodb mongosh --quiet --eval '
+            const db_ = db.getSiblingDB("webhook_inbox");
+            const ttl = db_.events.getIndexes().find(i => i.name === "event_ttl");
+            if (!ttl || ttl.expireAfterSeconds !== 0) { print("missing TTL index"); quit(1); }
+            if (db_.events.countDocuments({expires_at: {$exists: true}}) === 0) {
+              print("no event carries an expiry"); quit(1);
+            }
+            print("TTL index present and expiries written");
+          '
+
       - name: Replay refuses every internal destination
         run: |
           event=$(curl -fsS -X POST http://localhost:8000/webhooks/demo \

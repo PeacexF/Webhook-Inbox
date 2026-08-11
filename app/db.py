@@ -15,6 +15,7 @@ EVENT_INDEXES = [
     IndexModel([("event_type", 1)], name="event_type"),
     IndexModel([("search.tokens", 1)], name="search_tokens"),
     IndexModel([("search.trigrams", 1)], name="search_trigrams"),
+    IndexModel([("expires_at", 1)], name="event_ttl", expireAfterSeconds=0),
 ]
 
 ENDPOINT_INDEXES = [

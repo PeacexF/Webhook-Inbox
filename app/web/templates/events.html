@@ -49,6 +49,15 @@
   <a class="btn" href="/events">Reset</a>
 </form>
 
+<div class="export-bar">
+  <span class="hint">Export these results:</span>
+  {% for name in ['json', 'jsonl', 'csv'] %}
+  <a class="btn" href="/events/export?format={{ name }}{{ '&' ~ export_query if export_query }}">
+    {{ name|upper }}
+  </a>
+  {% endfor %}
+</div>
+
 <div id="results">
   {% include "_events_table.html" %}
   <div class="pager">

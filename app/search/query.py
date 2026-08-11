@@ -1,4 +1,5 @@
 import re
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from itertools import chain
@@ -166,7 +167,7 @@ class TrigramBackend:
     """Ranks with the tokens/trigrams multikey indexes - no text index needed."""
 
     def build_pipeline(
-        self, query: str, filters: Filters, limit: int, cursor: Cursor | None
+        self, query: str, filters: Filters, limit: int | None, cursor: Cursor | None
     ) -> list[Doc]:
         exact = normalize(query)
         terms = list(dict.fromkeys(split_terms(exact)))
@@ -179,10 +180,10 @@ class TrigramBackend:
         ]
         if cursor and cursor.score is not None:
             pipeline.append({"$match": _cursor_clause(cursor)})
-        pipeline += [
-            {"$sort": {"score": -1, "received_at": -1, "_id": -1}},
-            {"$limit": limit},
-        ]
+        pipeline.append({"$sort": {"score": -1, "received_at": -1, "_id": -1}})
+        # Exports run the same pipeline unbounded
+        if limit is not None:
+            pipeline.append({"$limit": limit})
         return pipeline
 
     async def search(
@@ -203,6 +204,17 @@ async def list_events(
     if cursor:
         query["received_at"] = {**query.get("received_at", {}), "$lt": cursor.received_at}
     return [doc async for doc in db.events.find(query).sort("received_at", -1).limit(limit)]
+
+
+async def stream_events(db: Database, query: str, filters: Filters) -> AsyncIterator[Doc]:
+    # Every match, unbounded, for export
+    if query.strip():
+        pipeline = TrigramBackend().build_pipeline(query, filters, None, None)
+        async for document in await db.events.aggregate(pipeline, allowDiskUse=True):
+            yield document
+    else:
+        async for document in db.events.find(filters.to_query()).sort("received_at", -1):
+            yield document
 
 
 async def find_events(

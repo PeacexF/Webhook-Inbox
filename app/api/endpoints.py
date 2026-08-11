@@ -4,9 +4,10 @@ from fastapi import APIRouter, HTTPException, Response, status
 from pymongo.errors import DuplicateKeyError
 
 from app.db import Database, Doc
-from app.deps import DatabaseDep
+from app.deps import DatabaseDep, SettingsDep
 from app.log import get_logger
 from app.models.endpoint import EndpointCreate, EndpointOut, EndpointUpdate
+from app.retention import reapply
 
 router = APIRouter(prefix="/api/endpoints", tags=["endpoints"])
 logger = get_logger(__name__)
@@ -49,7 +50,7 @@ async def get_endpoint(endpoint_id: str, db: DatabaseDep) -> EndpointOut:
 
 @router.patch("/{endpoint_id}")
 async def update_endpoint(
-    endpoint_id: str, payload: EndpointUpdate, db: DatabaseDep
+    endpoint_id: str, payload: EndpointUpdate, db: DatabaseDep, settings: SettingsDep
 ) -> EndpointOut:
     document = await _find_or_404(db, endpoint_id)
     changes = payload.to_changes()
@@ -68,6 +69,9 @@ async def update_endpoint(
         raise HTTPException(status.HTTP_409_CONFLICT, "Path is already in use") from None
     if updated is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Endpoint not found")
+    # Stored events keep their old expiry unless it is recomputed here
+    if "retention_days" in changes:
+        await reapply(db, updated, settings.retention)
     logger.info("endpoint.updated", id=endpoint_id, fields=sorted(changes))
     return EndpointOut.from_document(updated)
 

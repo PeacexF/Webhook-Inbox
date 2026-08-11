@@ -2,7 +2,7 @@ import httpx
 import pytest
 
 from tests.conftest import ADMIN_USERNAME
-from tests.helpers import create_endpoint
+from tests.helpers import create_endpoint, first_event_id
 
 pytestmark = pytest.mark.integration
 
@@ -23,7 +23,7 @@ async def test_event_detail_tabs(authed_client: httpx.AsyncClient) -> None:
         headers={"x-webhook-event": "checkout.session.completed"},
     )
     listing = await authed_client.get("/events")
-    event_id = listing.text.split("/events/")[1].split("'")[0]
+    event_id = first_event_id(listing.text)
 
     overview = await authed_client.get(f"/events/{event_id}")
     assert "checkout.session.completed" in overview.text
@@ -46,7 +46,7 @@ async def test_event_detail_tabs(authed_client: httpx.AsyncClient) -> None:
 async def test_event_detail_unescapes_restricted_keys(authed_client: httpx.AsyncClient) -> None:
     await authed_client.post("/webhooks/demo", json={"a.b": 1})
     listing = await authed_client.get("/events")
-    event_id = listing.text.split("/events/")[1].split("'")[0]
+    event_id = first_event_id(listing.text)
 
     body = await authed_client.get(f"/events/{event_id}?tab=body")
     assert "a.b" in body.text

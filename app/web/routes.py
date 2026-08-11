@@ -6,7 +6,7 @@ from urllib.parse import urlencode
 from bson import ObjectId
 from bson.errors import InvalidId
 from fastapi import APIRouter, Form, HTTPException, Query, Request, Response, status
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import ValidationError
 from pymongo.errors import DuplicateKeyError
@@ -21,7 +21,8 @@ from app.auth import (
     verify_password,
 )
 from app.db import Database, Doc
-from app.deps import DatabaseDep, SettingsDep
+from app.deps import DatabaseDep, EventQueryDep, SettingsDep
+from app.export import CONTENT_TYPES, FORMATS, STREAMERS, filename
 from app.ingest.parser import unescape_keys
 from app.log import get_logger
 from app.models.endpoint import (
@@ -36,7 +37,8 @@ from app.models.replay import ReplayCreate, ReplayOut
 from app.models.user import UserCreate, UserOut
 from app.replay import store
 from app.replay.ssrf import DestinationError, validate
-from app.search.query import Cursor, Filters, find_events
+from app.retention import reapply
+from app.search.query import Cursor, find_events, stream_events
 from app.web.json_view import render_json
 
 router = APIRouter()
@@ -128,44 +130,14 @@ async def dashboard(request: Request, db: DatabaseDep) -> Response:
 
 @router.get("/events")
 async def events_page(
-    request: Request,
-    db: DatabaseDep,
-    q: str = "",
-    endpoint: str = "",
-    event_status: Annotated[str, Query(alias="status")] = "",
-    method: str = "",
-    event_type: Annotated[str, Query(alias="type")] = "",
-    date_from: Annotated[str, Query(alias="from")] = "",
-    date_to: Annotated[str, Query(alias="to")] = "",
-    cursor: str | None = None,
+    request: Request, db: DatabaseDep, query: EventQueryDep, cursor: str | None = None
 ) -> Response:
-    filters = Filters(
-        endpoint=endpoint or None,
-        status=event_status or None,
-        method=method or None,
-        event_type=event_type or None,
-        date_from=date_from or None,
-        date_to=date_to or None,
-    )
-    rows, scored = await find_events(db, q, filters, PAGE_SIZE, Cursor.decode(cursor))
+    rows, scored = await find_events(db, query.q, query.filters, PAGE_SIZE, Cursor.decode(cursor))
 
-    params = {
-        key: value
-        for key, value in (
-            ("q", q),
-            ("endpoint", endpoint),
-            ("status", event_status),
-            ("method", method),
-            ("type", event_type),
-            ("from", date_from),
-            ("to", date_to),
-        )
-        if value
-    }
     next_url = None
     if len(rows) == PAGE_SIZE:
         # Keyset pagination: cheaper than skip once the collection grows
-        forward = {**params, "cursor": Cursor.after(rows[-1], scored).encode()}
+        forward = {**query.params, "cursor": Cursor.after(rows[-1], scored).encode()}
         next_url = f"/events?{urlencode(forward)}"
 
     return render(
@@ -176,14 +148,34 @@ async def events_page(
             "events": rows,
             "scored": scored,
             # A total for a ranked search would mean a second pass over every match
-            "total": None if scored else await db.events.count_documents(filters.to_query()),
+            "total": None if scored else await db.events.count_documents(query.filters.to_query()),
             "next_url": next_url,
-            "params": params,
+            "params": query.params,
+            "export_query": urlencode(query.params),
             "endpoints": await _endpoint_list(db),
             "event_types": sorted(t for t in await db.events.distinct("event_type") if t),
             "statuses": sorted(await db.events.distinct("processing.status")),
             "methods": sorted(ALLOWED_METHODS),
         },
+    )
+
+
+@router.get("/events/export")
+async def export_events(
+    db: DatabaseDep,
+    query: EventQueryDep,
+    export_format: Annotated[str, Query(alias="format")] = "jsonl",
+) -> Response:
+    if export_format not in FORMATS:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, f"Format must be one of {', '.join(FORMATS)}"
+        )
+    name = filename(export_format, datetime.now(UTC))
+    logger.info("export.started", format=export_format, filters=sorted(query.params))
+    return StreamingResponse(
+        STREAMERS[export_format](stream_events(db, query.q, query.filters)),
+        media_type=CONTENT_TYPES[export_format],
+        headers={"Content-Disposition": f'attachment; filename="{name}"'},
     )
 
 
@@ -337,6 +329,7 @@ async def endpoint_detail(request: Request, db: DatabaseDep, endpoint_id: str) -
 async def endpoint_save(
     request: Request,
     db: DatabaseDep,
+    settings: SettingsDep,
     endpoint_id: str,
     name: Annotated[str, Form()],
     path: Annotated[str, Form()],
@@ -382,6 +375,8 @@ async def endpoint_save(
         await db.endpoints.update_one({"_id": object_id}, {"$set": changes})
     except DuplicateKeyError:
         return fail("That path is already in use")
+    if "retention_days" in changes:
+        await reapply(db, merged, settings.retention)
     logger.info("endpoint.updated", id=endpoint_id, fields=sorted(changes))
     return _refresh(f"/endpoints/{endpoint_id}")
 
@@ -398,7 +393,14 @@ async def endpoint_delete(db: DatabaseDep, endpoint_id: str) -> Response:
 
 async def _settings_context(db: Database, settings: Any) -> dict[str, Any]:
     users = [UserOut.from_document(doc) async for doc in db.users.find().sort("username", 1)]
-    return {"active": "settings", "users": users, "settings": settings}
+    return {
+        "active": "settings",
+        "users": users,
+        "settings": settings,
+        "endpoints": await _endpoint_list(db),
+        "expiring": await db.events.count_documents({"expires_at": {"$exists": True}}),
+        "kept_forever": await db.events.count_documents({"expires_at": {"$exists": False}}),
+    }
 
 
 @router.get("/settings")

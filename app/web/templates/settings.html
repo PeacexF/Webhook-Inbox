@@ -60,11 +60,40 @@
   <button class="primary" type="submit">Add user</button>
 </form>
 
+<h2>Retention</h2>
+<dl class="kv">
+  <dt>Default</dt>
+  <dd>
+    {% if settings.retention.enabled %}
+    Events are deleted {{ settings.retention.default_days }} days after they arrive
+    {% else %}
+    <span class="status warn">disabled</span> — events are kept until deleted by hand
+    {% endif %}
+  </dd>
+  <dt>Per-endpoint overrides</dt>
+  <dd>
+    {% set overridden = endpoints | selectattr('retention_days') | list %}
+    {% if overridden %}
+    {% for item in overridden %}
+    <div>{{ item.name }} — {{ item.retention_days }} days</div>
+    {% endfor %}
+    {% else %}—{% endif %}
+  </dd>
+  <dt>Stored events</dt>
+  <dd>
+    {{ "{:,}".format(expiring) }} will expire, {{ "{:,}".format(kept_forever) }} kept forever
+  </dd>
+</dl>
+<p class="hint">
+  MongoDB removes expired events with a background task that runs about once a minute, so
+  deletion happens shortly <em>after</em> the retention window, not exactly on it. An event may
+  stay readable for a short while past its expiry. Changing an endpoint's retention recomputes
+  the expiry of its stored events.
+</p>
+
 <h2>Configuration</h2>
 <dl class="kv">
   <dt>Max payload size</dt><dd>{{ "{:,}".format(settings.limits.max_payload_size) }} bytes</dd>
-  <dt>Retention</dt>
-  <dd>{{ settings.retention.default_days }} days{{ '' if settings.retention.enabled else ' (disabled)' }}</dd>
   <dt>Rate limit</dt>
   <dd>{{ settings.rate_limit.requests_per_minute }}/min{{ '' if settings.rate_limit.enabled else ' (disabled)' }}</dd>
   <dt>Replay</dt>
