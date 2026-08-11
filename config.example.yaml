@@ -1,8 +1,11 @@
 # Non-secret configuration
 #
-# run -> cp config.example.yaml config.yaml 
+# run -> cp config.example.yaml config.yaml
 #
 # or change CONFIG_FILE to another path
+#
+# Precedence: environment > .env > this file > defaults.
+# Never put credentials here; use .env so they stay out of the repo.
 
 search:
   enabled: true
@@ -12,8 +15,21 @@ replay:
   enabled: true
   timeout: 10
   max_retries: 3
+  retry_delay_seconds: 2
+
+  # Opens every private range at once, including cloud metadata endpoints.
+  # Only enable it for local development.
   allow_private_networks: false
+
+  # When enabled, every hop is revalidated against the same rules
   allow_redirects: false
+  max_redirects: 3
+  max_response_size: 65536
+
+  # Turn off when replay runs as its own service (see compose.prod.yaml)
+  worker_enabled: true
+  poll_interval: 1.0
+  lease_timeout: 60
 
 retention:
   enabled: true
@@ -22,7 +38,19 @@ retention:
 limits:
   max_payload_size: 10485760
   request_timeout: 10
+  max_header_count: 100
+  max_header_bytes: 16384
+  max_query_length: 4096
 
 rate_limit:
   enabled: true
+
+  # Per endpoint and source address, for webhook ingestion
   requests_per_minute: 120
+
+  # Per source address, for sign-in
+  login_per_minute: 10
+  
+  # Only enable behind a proxy you control that appends the real address.
+  # Otherwise anyone can forge the header and dodge the limit.
+  trust_forwarded_for: false

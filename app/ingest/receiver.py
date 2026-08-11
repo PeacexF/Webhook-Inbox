@@ -2,9 +2,10 @@ from datetime import UTC, datetime
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
+from starlette.datastructures import Headers
 
 from app.db import Doc
-from app.deps import DatabaseDep, SettingsDep
+from app.deps import DatabaseDep, RateLimiterDep, SettingsDep
 from app.ingest.parser import (
     decode_raw,
     escape_keys,
@@ -14,6 +15,7 @@ from app.ingest.parser import (
 from app.ingest.signature import verify
 from app.log import get_logger
 from app.models.endpoint import ALLOWED_METHODS, normalize_path
+from app.ratelimit import client_key
 from app.retention import expires_at
 from app.search import tokenize
 
@@ -41,9 +43,15 @@ async def read_limited(request: Request, limit: int) -> bytes:
     return b"".join(chunks)
 
 
-def _reject(status: int, reason: str, path: str) -> JSONResponse:
+def _reject(
+    status: int, reason: str, path: str, headers: dict[str, str] | None = None
+) -> JSONResponse:
     logger.warning("event.rejected", endpoint=path, reason=reason, status=status)
-    return JSONResponse({"detail": reason}, status_code=status)
+    return JSONResponse({"detail": reason}, status_code=status, headers=headers)
+
+
+def _header_bytes(headers: Headers) -> int:
+    return sum(len(key) + len(value) + 4 for key, value in headers.items())
 
 
 @router.api_route("/webhooks/{path:path}", methods=list(ALLOWED_METHODS))
@@ -52,8 +60,25 @@ async def receive(
     request: Request,
     db: DatabaseDep,
     settings: SettingsDep,
+    limiter: RateLimiterDep,
 ) -> JSONResponse:
     path = normalize_path(path)
+    limits = settings.limits
+
+    # Shape checks and the rate limit come first: both are free
+    # and neither should cost a database round trip to answer
+    if len(request.headers) > limits.max_header_count:
+        return _reject(431, "Too many headers", path)
+    if _header_bytes(request.headers) > limits.max_header_bytes:
+        return _reject(431, "Headers too large", path)
+    if len(request.url.query) > limits.max_query_length:
+        return _reject(414, "Query string too long", path)
+
+    bucket = f"{path}:{client_key(request, settings.rate_limit)}"
+    if not limiter.allow(bucket):
+        retry = str(limiter.retry_after(bucket))
+        return _reject(429, "Rate limit exceeded", path, {"Retry-After": retry})
+
     endpoint = await db.endpoints.find_one({"path": path})
     if endpoint is None:
         return _reject(404, "Unknown endpoint", path)
@@ -74,7 +99,7 @@ async def receive(
         return _reject(401, "Invalid signature", path)
 
     content_type = headers.get("content-type", "")
-    body = parse_body(raw, content_type)
+    body = parse_body(raw, content_type, limits.max_json_depth)
     raw_text, raw_encoding = decode_raw(raw)
     event_type = extract_event_type(headers, body)
     query = dict(request.query_params)

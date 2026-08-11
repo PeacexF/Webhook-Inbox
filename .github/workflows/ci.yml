@@ -36,6 +36,20 @@ jobs:
       - name: Search benchmark (100k events, asserts no collection scan)
         run: uv run pytest -q -m slow
 
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Known vulnerabilities in runtime dependencies
+        run: |
+          uv export --format requirements-txt --no-emit-project --no-dev > requirements.txt
+          uvx pip-audit -r requirements.txt
+
   docker:
     runs-on: ubuntu-latest
     steps:
@@ -106,6 +120,34 @@ jobs:
             echo "secret leaked into the logs"; exit 1
           fi
           echo "no secret leaked"
+
+      - name: Sign-in is throttled
+        run: |
+          codes=""
+          for i in $(seq 1 14); do
+            codes="$codes $(curl -s -o /dev/null -w '%{http_code}' \
+              -X POST http://localhost:8000/api/auth/login \
+              -H 'Content-Type: application/json' \
+              -d '{"username":"admin","password":"wrong"}')"
+          done
+          echo "sign-in attempts:$codes"
+          case "$codes" in
+            *429*) echo "password guessing is throttled" ;;
+            *) echo "sign-in was never throttled"; exit 1 ;;
+          esac
+
+      - name: Oversized headers and query strings are refused
+        run: |
+          long=$(python3 -c 'print("x" * 8000)')
+          code=$(curl -s -o /dev/null -w '%{http_code}' -X POST \
+            "http://localhost:8000/webhooks/demo?pad=$long" -d '{}')
+          [ "$code" = 414 ] || { echo "long query returned $code, expected 414"; exit 1; }
+
+          python3 -c 'print("\n".join(f"header = \"x-pad-{i}: v\"" for i in range(1, 201)))' > /tmp/hdrs.conf
+          code=$(curl -s -o /dev/null -w '%{http_code}' -K /tmp/hdrs.conf \
+            -X POST http://localhost:8000/webhooks/demo -d '{}')
+          [ "$code" = 431 ] || { echo "header flood returned $code, expected 431"; exit 1; }
+          echo "request shape limits enforced"
 
       - name: Export streams every format and honours the filters
         run: |

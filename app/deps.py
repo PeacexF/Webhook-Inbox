@@ -5,6 +5,7 @@ from fastapi import Depends, Query, Request
 
 from app.config import Settings
 from app.db import Database
+from app.ratelimit import RateLimiter
 from app.search.query import Filters
 
 
@@ -16,6 +17,16 @@ def get_db(request: Request) -> Database:
 def get_settings(request: Request) -> Settings:
     settings: Settings = request.app.state.settings
     return settings
+
+
+def get_rate_limiter(request: Request) -> RateLimiter:
+    limiter: RateLimiter = request.app.state.rate_limiter
+    return limiter
+
+
+def get_login_limiter(request: Request) -> RateLimiter:
+    limiter: RateLimiter = request.app.state.login_limiter
+    return limiter
 
 
 @dataclass(frozen=True)
@@ -64,3 +75,5 @@ def event_query(
 DatabaseDep = Annotated[Database, Depends(get_db)]
 SettingsDep = Annotated[Settings, Depends(get_settings)]
 EventQueryDep = Annotated[EventQuery, Depends(event_query)]
+RateLimiterDep = Annotated[RateLimiter, Depends(get_rate_limiter)]
+LoginLimiterDep = Annotated[RateLimiter, Depends(get_login_limiter)]

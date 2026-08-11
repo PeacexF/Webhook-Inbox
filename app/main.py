@@ -13,7 +13,8 @@ from app.auth import seed_admin
 from app.config import Settings
 from app.db import create_client, ensure_indexes, seed_demo_endpoint
 from app.ingest import receiver
-from app.middleware import AuthMiddleware
+from app.middleware import AuthMiddleware, SecurityHeadersMiddleware
+from app.ratelimit import RateLimiter
 from app.replay.worker import run_forever
 from app.web import routes
 
@@ -48,7 +49,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         await client.close()
 
     app = FastAPI(title="Webhook Inbox", lifespan=lifespan)
+    app.state.rate_limiter = RateLimiter(
+        settings.rate_limit.requests_per_minute, settings.rate_limit.enabled
+    )
+    app.state.login_limiter = RateLimiter(
+        settings.rate_limit.login_per_minute, settings.rate_limit.enabled
+    )
     app.add_middleware(AuthMiddleware)
+    # Added last, so it runs first and stamps every response including error paths
+    app.add_middleware(SecurityHeadersMiddleware)
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
     app.include_router(health.router)
     app.include_router(auth_api.router)

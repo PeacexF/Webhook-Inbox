@@ -13,6 +13,10 @@ from pydantic_settings import (
 class LimitsConfig(BaseModel):
     max_payload_size: int = 10 * 1024 * 1024
     request_timeout: int = 10
+    max_header_count: int = 100
+    max_header_bytes: int = 16 * 1024
+    max_query_length: int = 4 * 1024
+    max_json_depth: int = 100
 
 
 class RetentionConfig(BaseModel):
@@ -42,12 +46,14 @@ class ReplayConfig(BaseModel):
 class RateLimitConfig(BaseModel):
     enabled: bool = True
     requests_per_minute: int = 120
+    login_per_minute: int = 10
+    trust_forwarded_for: bool = False
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
-        env_nested_delimiter="__",
+        env_nested_delimiter="__",  # note that it is 2 underscores
         extra="ignore",
     )
 

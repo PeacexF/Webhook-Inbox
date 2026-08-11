@@ -1,10 +1,14 @@
-# Overlay that moves replay delivery out of the web process:
+# Production overlay:
 #   docker compose -f compose.yaml -f compose.prod.yaml up -d
-# The worker runs the same image, so there is nothing extra to build or version.
+#
+# It does two things:
+# 1. Replay delivery moves out of the web process into its own service.
+# 2. MongoDB requires authentication, and the app connects as a least-privilege user.
 services:
   app:
     environment:
       REPLAY__WORKER_ENABLED: "false"
+      MONGO_URI: mongodb://${MONGO_APP_USERNAME:?set MONGO_APP_USERNAME}:${MONGO_APP_PASSWORD:?set MONGO_APP_PASSWORD}@mongodb:27017/${MONGO_DATABASE:-webhook_inbox}?authSource=${MONGO_DATABASE:-webhook_inbox}
 
   worker:
     build: .
@@ -13,7 +17,7 @@ services:
       - path: .env
         required: false
     environment:
-      MONGO_URI: mongodb://mongodb:27017
+      MONGO_URI: mongodb://${MONGO_APP_USERNAME:?set MONGO_APP_USERNAME}:${MONGO_APP_PASSWORD:?set MONGO_APP_PASSWORD}@mongodb:27017/${MONGO_DATABASE:-webhook_inbox}?authSource=${MONGO_DATABASE:-webhook_inbox}
       MONGO_DATABASE: ${MONGO_DATABASE:-webhook_inbox}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       REPLAY__WORKER_ENABLED: "true"
@@ -21,3 +25,22 @@ services:
       mongodb:
         condition: service_healthy
     restart: unless-stopped
+
+  mongodb:
+    command: ["mongod", "--auth"]
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME:?set MONGO_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:?set MONGO_ROOT_PASSWORD}
+      MONGO_INITDB_DATABASE: ${MONGO_DATABASE:-webhook_inbox}
+      MONGO_APP_USERNAME: ${MONGO_APP_USERNAME:?set MONGO_APP_USERNAME}
+      MONGO_APP_PASSWORD: ${MONGO_APP_PASSWORD:?set MONGO_APP_PASSWORD}
+    volumes:
+      - mongodb_data:/data/db
+      - ./scripts/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          mongosh --quiet --authenticationDatabase admin
+          -u "$$MONGO_INITDB_ROOT_USERNAME" -p "$$MONGO_INITDB_ROOT_PASSWORD"
+          --eval "db.adminCommand('ping')"

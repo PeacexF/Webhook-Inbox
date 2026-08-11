@@ -21,10 +21,11 @@ from app.auth import (
     verify_password,
 )
 from app.db import Database, Doc
-from app.deps import DatabaseDep, EventQueryDep, SettingsDep
+from app.deps import DatabaseDep, EventQueryDep, LoginLimiterDep, SettingsDep
 from app.export import CONTENT_TYPES, FORMATS, STREAMERS, filename
 from app.ingest.parser import unescape_keys
 from app.log import get_logger
+from app.middleware import is_https
 from app.models.endpoint import (
     ALLOWED_METHODS,
     AuthConfig,
@@ -35,6 +36,7 @@ from app.models.endpoint import (
 )
 from app.models.replay import ReplayCreate, ReplayOut
 from app.models.user import UserCreate, UserOut
+from app.ratelimit import client_key
 from app.replay import store
 from app.replay.ssrf import DestinationError, validate
 from app.retention import reapply
@@ -49,13 +51,15 @@ PAGE_SIZE = 50
 EVENT_TABS = ("overview", "headers", "query", "body", "raw", "replays")
 
 
-def render(request: Request, template: str, context: dict[str, Any]) -> Response:
+def render(
+    request: Request, template: str, context: dict[str, Any], status_code: int = 200
+) -> Response:
     base = {
         "user": request.state.user,
         "csrf_token": request.state.csrf_token,
         "active": context.pop("active", None),
     }
-    return templates.TemplateResponse(request, template, base | context)
+    return templates.TemplateResponse(request, template, base | context, status_code=status_code)
 
 
 def _refresh(url: str) -> Response:
@@ -84,9 +88,21 @@ async def login_page(request: Request) -> Response:
 async def login_submit(
     request: Request,
     db: DatabaseDep,
+    settings: SettingsDep,
+    limiter: LoginLimiterDep,
     username: Annotated[str, Form()],
     password: Annotated[str, Form()],
 ) -> Response:
+    bucket = f"login:{client_key(request, settings.rate_limit)}"
+    if not limiter.allow(bucket):
+        logger.warning("auth.throttled", username=username)
+        return render(
+            request,
+            "login.html",
+            {"error": "Too many sign-in attempts. Try again shortly."},
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+        )
+
     user = await authenticate(db, username, password)
     if user is None:
         logger.warning("auth.failed", username=username)
@@ -95,7 +111,7 @@ async def login_submit(
     token, _ = await create_session(db, user["_id"])
     logger.info("auth.login", username=username)
     response = RedirectResponse("/", status_code=303)
-    set_session_cookie(response, token, secure=request.url.scheme == "https")
+    set_session_cookie(response, token, secure=is_https(request))
     return response
 
 

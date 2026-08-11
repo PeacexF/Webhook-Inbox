@@ -51,15 +51,40 @@ def decode_raw(raw: bytes) -> tuple[str, str]:
         return base64.b64encode(raw).decode(), "base64"
 
 
-def parse_body(raw: bytes, content_type: str) -> Any:
+def nesting_depth(raw: bytes) -> int:
+    depth = maximum = 0
+    in_string = escaped = False
+    for byte in raw:
+        if in_string:
+            if escaped:
+                escaped = False
+            elif byte == 0x5C:  # backslash
+                escaped = True
+            elif byte == 0x22:  # closing quote
+                in_string = False
+            continue
+        if byte == 0x22:
+            in_string = True
+        elif byte in (0x7B, 0x5B):  # { [
+            depth += 1
+            maximum = max(maximum, depth)
+        elif byte in (0x7D, 0x5D):  # } ]
+            depth -= 1
+    return maximum
+
+
+def parse_body(raw: bytes, content_type: str, max_depth: int = 100) -> Any:
     # Structured representation of the body, or None when it has no useful one
     media_type = content_type.split(";")[0].strip().lower()
     if not raw:
         return None
     if media_type == "application/json" or media_type.endswith("+json"):
+        # raw_body is still kept, so an over-nested payload is stored, just not walked
+        if nesting_depth(raw) > max_depth:
+            return None
         try:
             return json.loads(raw)
-        except json.JSONDecodeError, UnicodeDecodeError:
+        except json.JSONDecodeError, UnicodeDecodeError, RecursionError:
             return None
     if media_type == "application/x-www-form-urlencoded":
         try:

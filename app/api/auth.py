@@ -9,9 +9,11 @@ from app.auth import (
     destroy_session,
     verify_password,
 )
-from app.deps import DatabaseDep
+from app.deps import DatabaseDep, LoginLimiterDep, SettingsDep
 from app.log import get_logger
+from app.middleware import is_https
 from app.models.user import UserOut
+from app.ratelimit import client_key
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 logger = get_logger(__name__)
@@ -45,7 +47,22 @@ async def authenticate(db: DatabaseDep, username: str, password: str) -> dict[st
 
 
 @router.post("/login")
-async def login(payload: LoginRequest, request: Request, db: DatabaseDep) -> Response:
+async def login(
+    payload: LoginRequest,
+    request: Request,
+    db: DatabaseDep,
+    settings: SettingsDep,
+    limiter: LoginLimiterDep,
+) -> Response:
+    bucket = f"login:{client_key(request, settings.rate_limit)}"
+    if not limiter.allow(bucket):
+        logger.warning("auth.throttled", username=payload.username)
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            "Too many sign-in attempts",
+            headers={"Retry-After": str(limiter.retry_after(bucket))},
+        )
+
     user = await authenticate(db, payload.username, payload.password)
     if user is None:
         logger.warning("auth.failed", username=payload.username)
@@ -55,7 +72,7 @@ async def login(payload: LoginRequest, request: Request, db: DatabaseDep) -> Res
     logger.info("auth.login", username=payload.username)
     # API clients need the CSRF token to mutate cuz the dashboard reads it from the page
     response = JSONResponse({"csrf_token": csrf_token})
-    set_session_cookie(response, token, secure=request.url.scheme == "https")
+    set_session_cookie(response, token, secure=is_https(request))
     return response
 
 

@@ -31,6 +31,8 @@ CSV_COLUMNS = (
     "body",
 )
 
+FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
+
 Rows = AsyncIterator[Doc]
 
 
@@ -70,11 +72,19 @@ async def stream_json(rows: Rows) -> AsyncIterator[str]:
     yield "\n]\n"
 
 
+def csv_safe(value: Any) -> Any:
+    # A cell starting with one of these is evaluated as a formula by spreadsheet software
+    # Event types and payloads are attacker-controlled, so neutralise them
+    if isinstance(value, str) and value[:1] in FORMULA_PREFIXES:
+        return "'" + value
+    return value
+
+
 def csv_row(document: Doc) -> list[Any]:
     request = document.get("request", {})
     processing = document.get("processing", {})
     metadata = document.get("metadata", {})
-    return [
+    cells = [
         str(document["_id"]),
         _encode(document["received_at"]),
         document.get("endpoint", {}).get("name"),
@@ -88,6 +98,7 @@ def csv_row(document: Doc) -> list[Any]:
         metadata.get("user_agent"),
         request.get("raw_body"),
     ]
+    return [csv_safe(cell) for cell in cells]
 
 
 async def stream_csv(rows: Rows) -> AsyncIterator[str]:
