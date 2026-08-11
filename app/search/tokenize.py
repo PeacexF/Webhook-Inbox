@@ -8,7 +8,7 @@ from app.log import is_sensitive
 
 SPLIT = re.compile(r"[^a-z0-9]+")
 
-# Arrays land in multikey indexes, 
+# Arrays land in multikey indexes,
 # where one huge event would cost as much as thousands of small ones
 # Caps bound that and oversized payloads lose the tail
 TOKEN_LIMIT = 512
