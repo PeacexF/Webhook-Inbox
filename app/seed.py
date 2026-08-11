@@ -94,7 +94,9 @@ PREFIX = {"github": "sha256=", "stripe": ""}
 
 
 async def reset(db: Database) -> None:
-    for collection in ("events", "endpoints", "replays"):
+    # Endpoints are left alone: wiping them would take the auto-seeded `demo`
+    # endpoint with them, and the quick start in the README posts to it
+    for collection in ("events", "replays"):
         await db[collection].delete_many({})
 
 
