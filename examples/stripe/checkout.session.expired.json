@@ -1,0 +1,25 @@
+{
+  "id": "evt_1PGxDeF3fAwLZmp3D0l4oOrS",
+  "object": "event",
+  "type": "checkout.session.expired",
+  "created": 1786534912,
+  "livemode": false,
+  "data": {
+    "object": {
+      "id": "cs_test_b2J0lMnOpQrStUvWxYzA",
+      "object": "checkout.session",
+      "amount_total": 1900,
+      "currency": "usd",
+      "customer_details": {
+        "email": "grace@example.com",
+        "name": "Grace Hopper"
+      },
+      "payment_status": "unpaid",
+      "status": "expired",
+      "metadata": {
+        "order_id": "ord_88214",
+        "workspace": "acme-engineering"
+      }
+    }
+  }
+}

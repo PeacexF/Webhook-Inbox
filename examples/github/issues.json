@@ -1,0 +1,26 @@
+{
+  "action": "opened",
+  "issue": {
+    "id": 2311874002,
+    "number": 87,
+    "title": "Search misses transposed characters",
+    "body": "Searching for `jhon` does not find `john`. Trigrams share nothing once adjacent characters swap in a short word.",
+    "state": "open",
+    "user": {
+      "login": "ada",
+      "type": "User"
+    },
+    "labels": [
+      { "name": "search", "color": "71849a" },
+      { "name": "known-limitation", "color": "b28a4a" }
+    ],
+    "comments": 2
+  },
+  "repository": {
+    "name": "webhook-inbox",
+    "full_name": "acme/webhook-inbox"
+  },
+  "sender": {
+    "login": "ada"
+  }
+}

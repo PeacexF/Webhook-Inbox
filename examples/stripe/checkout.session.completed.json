@@ -1,0 +1,47 @@
+{
+  "id": "evt_1PGxAbC2eZvKYlo2C9k3mNqR",
+  "object": "event",
+  "type": "checkout.session.completed",
+  "created": 1786531384,
+  "livemode": false,
+  "api_version": "2026-06-30",
+  "data": {
+    "object": {
+      "id": "cs_test_a1H9kLmNoPqRsTuVwXyZ",
+      "object": "checkout.session",
+      "amount_subtotal": 4200,
+      "amount_total": 4620,
+      "currency": "usd",
+      "customer": "cus_QRstUvWxYz1234",
+      "customer_details": {
+        "email": "ada@example.com",
+        "name": "Ada Lovelace",
+        "address": {
+          "city": "London",
+          "country": "GB",
+          "postal_code": "NW1 6XE"
+        }
+      },
+      "payment_status": "paid",
+      "status": "complete",
+      "line_items": [
+        {
+          "description": "Pro plan, annual",
+          "quantity": 1,
+          "amount_total": 4200,
+          "currency": "usd"
+        },
+        {
+          "description": "Priority support",
+          "quantity": 1,
+          "amount_total": 420,
+          "currency": "usd"
+        }
+      ],
+      "metadata": {
+        "order_id": "ord_88213",
+        "workspace": "acme-engineering"
+      }
+    }
+  }
+}

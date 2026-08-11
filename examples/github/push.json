@@ -1,0 +1,44 @@
+{
+  "ref": "refs/heads/main",
+  "before": "9b2c4d1e7f0a3b8c5d6e2f1a4b7c9d0e3f5a6b81",
+  "after": "3f5a6b81c2d4e7f09b2c4d1e7f0a3b8c5d6e2f1a",
+  "repository": {
+    "id": 771823901,
+    "name": "webhook-inbox",
+    "full_name": "acme/webhook-inbox",
+    "private": true,
+    "default_branch": "main"
+  },
+  "pusher": {
+    "name": "ada",
+    "email": "ada@example.com"
+  },
+  "commits": [
+    {
+      "id": "3f5a6b81c2d4e7f09b2c4d1e7f0a3b8c5d6e2f1a",
+      "message": "Add trigram index for fuzzy search",
+      "author": {
+        "name": "Ada Lovelace",
+        "username": "ada"
+      },
+      "added": ["app/search/tokenize.py"],
+      "modified": ["app/db.py", "app/ingest/receiver.py"],
+      "removed": []
+    },
+    {
+      "id": "c2d4e7f09b2c4d1e7f0a3b8c5d6e2f1a3f5a6b81",
+      "message": "Cap token arrays so one payload cannot dominate the index",
+      "author": {
+        "name": "Grace Hopper",
+        "username": "grace"
+      },
+      "added": [],
+      "modified": ["app/search/tokenize.py"],
+      "removed": []
+    }
+  ],
+  "head_commit": {
+    "id": "3f5a6b81c2d4e7f09b2c4d1e7f0a3b8c5d6e2f1a",
+    "message": "Add trigram index for fuzzy search"
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "id": "evt_1PGxGhI4gBxMAnq4E1m5pPsT",
+  "object": "event",
+  "type": "payment_intent.succeeded",
+  "created": 1786537001,
+  "livemode": false,
+  "data": {
+    "object": {
+      "id": "pi_3PGxGhI4gBxMAnq41zXcVbNm",
+      "object": "payment_intent",
+      "amount": 4620,
+      "amount_received": 4620,
+      "currency": "usd",
+      "status": "succeeded",
+      "payment_method_types": ["card"],
+      "charges": {
+        "data": [
+          {
+            "id": "ch_3PGxGhI4gBxMAnq41aBcDeFg",
+            "paid": true,
+            "outcome": {
+              "network_status": "approved_by_network",
+              "risk_level": "normal",
+              "seller_message": "Payment complete."
+            }
+          }
+        ]
+      },
+      "metadata": {
+        "order_id": "ord_88213",
+        "workspace": "acme-engineering"
+      }
+    }
+  }
+}

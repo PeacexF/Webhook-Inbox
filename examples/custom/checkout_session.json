@@ -1,0 +1,10 @@
+{
+  "event": "checkout_session",
+  "note": "Near-match fixture: the same words joined with an underscore rather than dots.",
+  "occurred_at": "2026-08-09T16:04:58Z",
+  "session": {
+    "id": "sess_7741",
+    "status": "started",
+    "customer_email": "ada@example.com"
+  }
+}

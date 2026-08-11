@@ -1,0 +1,34 @@
+{
+  "event": "order.updated",
+  "occurred_at": "2026-08-10T09:41:07Z",
+  "order": {
+    "id": "ord_88213",
+    "status": "shipped",
+    "previous_status": "processing",
+    "workspace": "acme-engineering",
+    "customer": {
+      "id": 1827,
+      "name": "John Doe",
+      "email": "john.doe@example.com"
+    },
+    "items": [
+      { "sku": "PLAN-PRO-Y", "description": "Pro plan, annual", "quantity": 1, "price": 4200 },
+      { "sku": "SUP-PRIORITY", "description": "Priority support", "quantity": 1, "price": 420 }
+    ],
+    "shipping": {
+      "carrier": "DHL",
+      "tracking": "JD014600009012345678",
+      "address": {
+        "city": "London",
+        "country": "GB",
+        "postal_code": "NW1 6XE"
+      }
+    },
+    "totals": {
+      "subtotal": 4620,
+      "tax": 924,
+      "total": 5544,
+      "currency": "usd"
+    }
+  }
+}

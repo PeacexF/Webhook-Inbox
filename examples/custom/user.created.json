@@ -1,0 +1,22 @@
+{
+  "event": "user.created",
+  "occurred_at": "2026-08-09T14:22:31Z",
+  "user": {
+    "id": 1827,
+    "name": "John Doe",
+    "email": "john.doe@example.com",
+    "roles": ["member", "billing"],
+    "workspace": {
+      "id": "acme-engineering",
+      "plan": "pro",
+      "seats_used": 34
+    },
+    "preferences": {
+      "theme": "dark",
+      "notifications": {
+        "email": true,
+        "webhook": true
+      }
+    }
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "id": "evt_1PGxJkL5hCyNBor5F2n6qQtU",
+  "object": "event",
+  "type": "invoice.payment_failed",
+  "created": 1786540233,
+  "livemode": false,
+  "data": {
+    "object": {
+      "id": "in_1PGxJkL5hCyNBor5",
+      "object": "invoice",
+      "amount_due": 4620,
+      "attempt_count": 3,
+      "currency": "usd",
+      "customer": "cus_QRstUvWxYz1234",
+      "customer_email": "ada@example.com",
+      "status": "open",
+      "last_finalization_error": {
+        "code": "card_declined",
+        "decline_code": "insufficient_funds",
+        "message": "Your card has insufficient funds."
+      },
+      "metadata": {
+        "workspace": "acme-engineering"
+      }
+    }
+  }
+}

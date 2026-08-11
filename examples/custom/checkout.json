@@ -1,0 +1,11 @@
+{
+  "event": "checkout",
+  "note": "Near-match fixture: the bare word, so search has an exact hit to rank above the fuzzy ones.",
+  "occurred_at": "2026-08-10T11:15:44Z",
+  "cart": {
+    "id": "cart_5513",
+    "items": 1,
+    "total": 1900,
+    "currency": "usd"
+  }
+}

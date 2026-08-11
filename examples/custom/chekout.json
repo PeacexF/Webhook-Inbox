@@ -1,0 +1,11 @@
+{
+  "event": "chekout",
+  "note": "Deliberate near-match fixture. A real integration once shipped this typo, which is exactly the case fuzzy search has to survive.",
+  "occurred_at": "2026-08-09T16:02:11Z",
+  "cart": {
+    "id": "cart_5512",
+    "items": 3,
+    "total": 4620,
+    "currency": "usd"
+  }
+}

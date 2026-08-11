@@ -1,4 +1,4 @@
-.PHONY: install lint format typecheck test test-all backfill check clean
+.PHONY: install lint format typecheck test test-all backfill seed seed-reset check clean
 
 install:
 	uv sync
@@ -23,6 +23,13 @@ test-all:
 
 backfill:
 	uv run python -m app.search.backfill
+
+# Realistic demo data, sent through the real ingest path
+seed:
+	docker compose exec app python -m app.seed
+
+seed-reset:
+	docker compose exec app python -m app.seed --reset
 
 check: lint typecheck test
 

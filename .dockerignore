@@ -3,7 +3,6 @@
 .venv
 tests
 docs
-examples
 *.md
 !README.md
 .env

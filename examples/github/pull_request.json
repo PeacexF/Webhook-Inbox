@@ -1,0 +1,39 @@
+{
+  "action": "opened",
+  "number": 142,
+  "pull_request": {
+    "id": 1998234771,
+    "number": 142,
+    "state": "open",
+    "title": "Harden replay against SSRF",
+    "body": "Validates the destination before queueing and again before every connection, including each redirect hop.",
+    "user": {
+      "login": "grace",
+      "type": "User"
+    },
+    "head": {
+      "ref": "harden-replay",
+      "sha": "5d6e2f1a4b7c9d0e3f5a6b81c2d4e7f09b2c4d1e"
+    },
+    "base": {
+      "ref": "main",
+      "sha": "9b2c4d1e7f0a3b8c5d6e2f1a4b7c9d0e3f5a6b81"
+    },
+    "labels": [
+      { "name": "security", "color": "b86a68" },
+      { "name": "review-needed", "color": "5f8f72" }
+    ],
+    "additions": 412,
+    "deletions": 27,
+    "changed_files": 9,
+    "draft": false
+  },
+  "repository": {
+    "name": "webhook-inbox",
+    "full_name": "acme/webhook-inbox",
+    "private": true
+  },
+  "sender": {
+    "login": "grace"
+  }
+}
