@@ -20,7 +20,7 @@ from app.auth import (
     hash_password,
     verify_password,
 )
-from app.db import Database
+from app.db import Database, Doc
 from app.deps import DatabaseDep, SettingsDep
 from app.ingest.parser import unescape_keys
 from app.log import get_logger
@@ -32,7 +32,10 @@ from app.models.endpoint import (
     EndpointUpdate,
     utcnow,
 )
+from app.models.replay import ReplayCreate, ReplayOut
 from app.models.user import UserCreate, UserOut
+from app.replay import store
+from app.replay.ssrf import DestinationError, validate
 from app.search.query import Cursor, Filters, find_events
 from app.web.json_view import render_json
 
@@ -41,7 +44,7 @@ templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 logger = get_logger(__name__)
 
 PAGE_SIZE = 50
-EVENT_TABS = ("overview", "headers", "query", "body", "raw")
+EVENT_TABS = ("overview", "headers", "query", "body", "raw", "replays")
 
 
 def render(request: Request, template: str, context: dict[str, Any]) -> Response:
@@ -184,26 +187,63 @@ async def events_page(
     )
 
 
-@router.get("/events/{event_id}")
-async def event_detail(
-    request: Request, db: DatabaseDep, event_id: str, tab: str = "overview"
-) -> Response:
+async def _event_or_404(db: Database, event_id: str) -> Doc:
     event = await db.events.find_one({"_id": _object_id(event_id)})
     if event is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Event not found")
+    return event
 
+
+async def _event_context(db: Database, event: Doc, tab: str, settings: Any) -> dict[str, Any]:
     body = unescape_keys(event["request"].get("body"))
-    return render(
-        request,
-        "event_detail.html",
-        {
-            "active": "events",
-            "event": event,
-            "tab": tab if tab in EVENT_TABS else "overview",
-            "body": body,
-            "body_html": render_json(body) if body is not None else "",
-        },
-    )
+    return {
+        "active": "events",
+        "event": event,
+        "tab": tab if tab in EVENT_TABS else "overview",
+        "body": body,
+        "body_html": render_json(body) if body is not None else "",
+        "replays": [ReplayOut.from_document(doc) for doc in await store.history(db, event["_id"])],
+        "replay_enabled": settings.replay.enabled,
+    }
+
+
+@router.get("/events/{event_id}")
+async def event_detail(
+    request: Request, db: DatabaseDep, settings: SettingsDep, event_id: str, tab: str = "overview"
+) -> Response:
+    event = await _event_or_404(db, event_id)
+    return render(request, "event_detail.html", await _event_context(db, event, tab, settings))
+
+
+@router.post("/events/{event_id}/replay")
+async def replay_submit(
+    request: Request,
+    db: DatabaseDep,
+    settings: SettingsDep,
+    event_id: str,
+    destination: Annotated[str, Form()],
+    method: Annotated[str, Form()] = "POST",
+) -> Response:
+    event = await _event_or_404(db, event_id)
+    if not settings.replay.enabled:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Replay is disabled")
+
+    try:
+        payload = ReplayCreate(destination=destination, method=method)
+        # Rejected here for immediate feedback; the worker validates again before connecting
+        validate(payload.destination, settings.replay)
+    except ValidationError as exc:
+        error = exc.errors()[0]["msg"]
+    except DestinationError as exc:
+        error = str(exc)
+    else:
+        await store.enqueue(db, event["_id"], payload, settings.replay)
+        logger.info("replay.queued", event_id=event_id, destination=payload.destination)
+        return _refresh(f"/events/{event_id}?tab=replays")
+
+    logger.warning("replay.rejected", event_id=event_id, reason=error)
+    context = await _event_context(db, event, "replays", settings)
+    return render(request, "event_detail.html", context | {"error": error})
 
 
 # --- endpoints ----------------------------------------------------------

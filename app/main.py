@@ -1,3 +1,4 @@
+import asyncio
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -7,12 +8,13 @@ from fastapi.staticfiles import StaticFiles
 
 from app import log
 from app.api import auth as auth_api
-from app.api import endpoints, health
+from app.api import endpoints, health, replays
 from app.auth import seed_admin
 from app.config import Settings
 from app.db import create_client, ensure_indexes, seed_demo_endpoint
 from app.ingest import receiver
 from app.middleware import AuthMiddleware
+from app.replay.worker import run_forever
 from app.web import routes
 
 logger = log.get_logger(__name__)
@@ -31,8 +33,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         await ensure_indexes(app.state.db)
         await seed_demo_endpoint(app.state.db)
         await seed_admin(app.state.db, settings.admin_username, settings.admin_password)
+
+        stop = asyncio.Event()
+        worker: asyncio.Task[None] | None = None
+        if settings.replay.enabled and settings.replay.worker_enabled:
+            worker = asyncio.create_task(run_forever(app.state.db, settings, stop))
+
         logger.info("app.started", database=settings.mongo_database)
         yield
+
+        stop.set()
+        if worker is not None:
+            await worker
         await client.close()
 
     app = FastAPI(title="Webhook Inbox", lifespan=lifespan)
@@ -41,6 +53,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(health.router)
     app.include_router(auth_api.router)
     app.include_router(endpoints.router)
+    app.include_router(replays.router)
     app.include_router(receiver.router)
     app.include_router(routes.router)
     return app

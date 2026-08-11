@@ -7,7 +7,7 @@
 </div>
 
 <div class="tabs">
-  {% for name in ['overview', 'headers', 'query', 'body', 'raw'] %}
+  {% for name in ['overview', 'headers', 'query', 'body', 'raw', 'replays'] %}
   <a href="/events/{{ event._id }}?tab={{ name }}"
      class="{{ 'active' if tab == name else '' }}">{{ name|capitalize }}</a>
   {% endfor %}
@@ -58,6 +58,75 @@
 <pre class="raw">{{ event.request.raw_body or '' }}</pre>
 {% if event.request.raw_encoding == 'base64' %}
 <p class="hint">Body was not valid UTF-8 and is shown base64-encoded.</p>
+{% endif %}
+
+{% elif tab == 'replays' %}
+{% if error %}<div class="alert error">{{ error }}</div>{% endif %}
+
+{% if replay_enabled %}
+<form class="panel" style="padding:1.1rem"
+      hx-post="/events/{{ event._id }}/replay" hx-target="body">
+  <div class="row">
+    <div class="field" style="flex:3">
+      <label for="destination">Destination URL</label>
+      <input id="destination" name="destination" type="url" required
+             placeholder="https://example.com/webhook">
+    </div>
+    <div class="field" style="flex:1">
+      <label for="method">Method</label>
+      <select id="method" name="method">
+        {% for name in ['POST', 'PUT', 'PATCH', 'GET', 'DELETE'] %}
+        <option value="{{ name }}" {% if name == event.request.method %}selected{% endif %}>
+          {{ name }}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+  </div>
+  <button class="primary" type="submit">Send replay</button>
+  <p class="hint">
+    The original bytes are resent. Credentials in the stored headers are not forwarded.
+  </p>
+</form>
+{% else %}
+<p class="hint">Replay is disabled in the configuration.</p>
+{% endif %}
+
+{% if replays %}
+<div class="panel">
+  <table>
+    <thead>
+      <tr><th>Sent</th><th>Destination</th><th>State</th><th>Status</th><th>Took</th></tr>
+    </thead>
+    <tbody>
+      {% for replay in replays %}
+      <tr>
+        <td class="time">{{ replay.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+        <td class="primary">{{ replay.method }} {{ replay.destination }}</td>
+        <td>
+          <span class="status {{ 'ok' if replay.state == 'success'
+                             else 'err' if replay.state == 'failed' else 'warn' }}">
+            {{ replay.state }}{% if replay.max_attempts > 1 and replay.attempt %}
+            ({{ replay.attempt }}/{{ replay.max_attempts }}){% endif %}
+          </span>
+        </td>
+        <td class="num">
+          {% if replay.response and replay.response.status_code %}
+          <span class="status {{ 'ok' if replay.response.status_code < 400 else 'err' }}">
+            {{ replay.response.status_code }}</span>
+          {% else %}—{% endif %}
+        </td>
+        <td class="num time">{{ replay.duration_ms ~ ' ms' if replay.duration_ms else '—' }}</td>
+      </tr>
+      {% if replay.error %}
+      <tr><td colspan="5" class="hint">{{ replay.error }}</td></tr>
+      {% endif %}
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p class="hint">No replays yet.</p>
 {% endif %}
 {% endif %}
 {% endblock %}

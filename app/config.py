@@ -29,8 +29,14 @@ class ReplayConfig(BaseModel):
     enabled: bool = True
     timeout: int = 10
     max_retries: int = 3
+    retry_delay_seconds: int = 2
     allow_private_networks: bool = False
     allow_redirects: bool = False
+    max_redirects: int = 3
+    max_response_size: int = 64 * 1024
+    worker_enabled: bool = True
+    poll_interval: float = 1.0
+    lease_timeout: int = 60
 
 
 class RateLimitConfig(BaseModel):

@@ -46,6 +46,7 @@ def make_client(
                 async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
                     # Tests that assert on stored documents reach the database here
                     client.db = app.state.db  # type: ignore[attr-defined]
+                    client.settings = app.state.settings  # type: ignore[attr-defined]
                     yield client
 
         return run()

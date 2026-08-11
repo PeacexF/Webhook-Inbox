@@ -33,6 +33,11 @@ SESSION_INDEXES = [
     IndexModel([("user_id", 1)], name="session_user"),
 ]
 
+REPLAY_INDEXES = [
+    IndexModel([("event_id", 1), ("created_at", -1)], name="replay_event"),
+    IndexModel([("state", 1), ("next_attempt_at", 1)], name="replay_queue"),
+]
+
 DEMO_ENDPOINT = {
     "name": "demo",
     "path": "demo",
@@ -54,6 +59,7 @@ async def ensure_indexes(db: Database) -> None:
     await db.endpoints.create_indexes(ENDPOINT_INDEXES)
     await db.users.create_indexes(USER_INDEXES)
     await db.sessions.create_indexes(SESSION_INDEXES)
+    await db.replays.create_indexes(REPLAY_INDEXES)
 
 
 async def seed_demo_endpoint(db: Database) -> None:

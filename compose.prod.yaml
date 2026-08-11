@@ -1,0 +1,23 @@
+# Overlay that moves replay delivery out of the web process:
+#   docker compose -f compose.yaml -f compose.prod.yaml up -d
+# The worker runs the same image, so there is nothing extra to build or version.
+services:
+  app:
+    environment:
+      REPLAY__WORKER_ENABLED: "false"
+
+  worker:
+    build: .
+    command: ["python", "-m", "app.replay.worker"]
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      MONGO_URI: mongodb://mongodb:27017
+      MONGO_DATABASE: ${MONGO_DATABASE:-webhook_inbox}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      REPLAY__WORKER_ENABLED: "true"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    restart: unless-stopped

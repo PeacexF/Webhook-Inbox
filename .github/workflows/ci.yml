@@ -107,6 +107,27 @@ jobs:
           fi
           echo "no secret leaked"
 
+      - name: Replay refuses every internal destination
+        run: |
+          event=$(curl -fsS -X POST http://localhost:8000/webhooks/demo \
+            -H 'Content-Type: application/json' -d '{"event":"replay.probe"}' \
+            | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')
+
+          for dest in 'http://mongodb:27017/x' 'http://127.0.0.1:8000/webhooks/demo' \
+                      'http://169.254.169.254/latest/meta-data/' 'file:///etc/passwd' \
+                      'gopher://mongodb:27017/_x' 'http://[::1]:8000/x'; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' -b /tmp/cookies -X POST \
+              "http://localhost:8000/api/events/$event/replay" \
+              -H 'Content-Type: application/json' -H "X-CSRF-Token: $CSRF" \
+              -d "{\"destination\":\"$dest\"}")
+            [ "$code" = 400 ] || { echo "$dest was accepted with $code, expected 400"; exit 1; }
+          done
+
+          queued=$(docker compose exec -T mongodb mongosh --quiet \
+            --eval "db.getSiblingDB('webhook_inbox').replays.countDocuments({})")
+          [ "$queued" = 0 ] || { echo "a blocked destination was still queued"; exit 1; }
+          echo "every internal destination refused, nothing queued"
+
       - name: Events survive an app restart
         run: |
           docker compose restart app
