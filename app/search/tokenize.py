@@ -8,7 +8,8 @@ from app.log import is_sensitive
 
 SPLIT = re.compile(r"[^a-z0-9]+")
 
-# Arrays land in multikey indexes, where one huge event would cost as much as thousands of small ones
+# Arrays land in multikey indexes, 
+# where one huge event would cost as much as thousands of small ones
 # Caps bound that and oversized payloads lose the tail
 TOKEN_LIMIT = 512
 TRIGRAM_LIMIT = 2048
@@ -27,7 +28,8 @@ def split_terms(value: str) -> list[str]:
 def tokenize(value: str) -> list[str]:
     normalized = normalize(value)
     parts = split_terms(normalized)
-    # Identifiers like checkout.session.completed stay matchable whole, but a whole sentence as one token would only bloat the index
+    # Identifiers like checkout.session.completed stay matchable whole,
+    # but a whole sentence as one token would only bloat the index
     if len(parts) > 1 and " " not in normalized:
         parts.append(normalized[:MAX_TOKEN_LENGTH])
     return parts
